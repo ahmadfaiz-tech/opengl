@@ -214,6 +214,27 @@ async function commitAndPush() {
         await runCommand(`git commit -m "${commitMessage}" --no-verify`);
         log.success('✅ Changes committed');
 
+        // Get current branch name
+        const currentBranch = await runCommand('git branch --show-current');
+        const branchName = currentBranch.trim() || 'master';
+
+        log.debug(`🔍 Current branch: ${branchName}`);
+
+        // Ensure we're on main branch (create if needed)
+        log.info('🌿 Ensuring main branch exists...');
+        try {
+            // Check if main branch exists
+            await runCommand('git show-ref --verify --quiet refs/heads/main', { ignoreErrors: true });
+            // If exists, checkout to main
+            await runCommand('git checkout main');
+        } catch (error) {
+            // Main doesn't exist, create it from current branch
+            if (branchName !== 'main') {
+                await runCommand('git branch -M main');
+                log.success('✅ Created and switched to main branch');
+            }
+        }
+
         // Create backup branch
         log.info(`🌿 Creating backup branch: ${BACKUP_BRANCH}`);
         try {
@@ -224,10 +245,13 @@ async function commitAndPush() {
             log.warning(`⚠️  Could not create backup branch: ${error.stderr || error.error.message}`);
         }
 
+        // Switch back to main
+        await runCommand('git checkout main');
+
         // Push to main
         log.info('🚀 Pushing to main branch...');
         try {
-            await runCommand('git push origin main');
+            await runCommand('git push -u origin main');
             log.success('✅ Successfully pushed to main branch');
         } catch (error) {
             if (error.stderr && error.stderr.includes('non-fast-forward')) {
