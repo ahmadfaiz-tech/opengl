@@ -1,0 +1,97 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "🚀 Run Dev Server",
+      "type": "npm",
+      "script": "dev",
+      "problemMatcher": [],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "detail": "Start Vite development server (npm run dev)"
+    },
+    {
+      "label": "📦 Build Production",
+      "type": "npm",
+      "script": "build",
+      "problemMatcher": [],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "detail": "Build project for production (npm run build)"
+    },
+    {
+      "label": "📥 Install Dependencies",
+      "type": "npm",
+      "script": "install",
+      "problemMatcher": [],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "detail": "Install npm dependencies (npm install)"
+    },
+    {
+      "label": "🛡️ Safe Backup to GitHub",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "safe-backup.cjs"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "detail": "Backup projek OpenGL ke GitHub - SEMUA fail projek akan disimpan dengan selamat"
+    },
+    {
+      "label": "🛡️ Ultra Safe Restore",
+      "type": "shell",
+      "command": "node",
+      "args": [
+        "ultra-safe-restore.cjs"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "new",
+        "showReuseMessage": true,
+        "clear": false
+      },
+      "detail": "Restore projek ke branch backup tertentu - Pilih branch interaktif dengan masa push"
+    }
+  ]
+}

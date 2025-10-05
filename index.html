@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenGL Interactive 3D Experience</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <div class="loader">
+      <div class="loader-bar"></div>
+    </div>
+    <p class="loading-text">Loading Experience...</p>
+    <p class="loading-percentage">0%</p>
+  </div>
+
+  <!-- Main Canvas -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- UI Overlay -->
+  <div id="ui-overlay">
+    <h1 class="title">OpenGL 3D Experience</h1>
+    <p class="subtitle">Inspired by igloo.inc</p>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:igloo.inc)",
+      "WebFetch(domain:www.awwwards.com)",
+      "Read(//d/Projects/contentanalysis/.vscode/**)",
+      "Read(//d/Projects/nasi-project/**)",
+      "Bash(rm:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "opengl-website",
+  "version": "1.0.0",
+  "description": "3D Interactive Website inspired by igloo.inc using Three.js and WebGL",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "threejs",
+    "webgl",
+    "3d",
+    "opengl",
+    "vite"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "three": "^0.170.0",
+    "gsap": "^3.12.5"
+  },
+  "devDependencies": {
+    "vite": "^6.0.1",
+    "terser": "^5.36.0"
+  }
+}

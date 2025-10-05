@@ -1,0 +1,38 @@
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+out/
+
+# Environment files
+.env
+.env.local
+
+# IDE files
+.vscode/settings.json
+.vscode/launch.json
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.log
+*.cache
+.temp/
+tmp/
+
+# Large files
+*.zip
+*.tar.gz
+*.rar
+
+# IMPORTANT: Keep all source files, configs, and project files
+# ✅ All .js, .json, .html, .css, .glsl files included
+# ✅ All config files included
+# ✅ .vscode/tasks.json included
