@@ -39,7 +39,8 @@ class IglooExperience {
 
     // Mouse tracking for parallax effect
     this.mouse = { x: 0, y: 0 }
-    this.targetCameraPosition = { x: 4, y: 1.5, z: 7 }  // 3/4 view angle (igloo.inc style)
+    this.originalCameraPosition = { x: 6, y: 2.5, z: 12 }  // Original 3/4 view angle (further away)
+    this.targetCameraPosition = { x: 6, y: 2.5, z: 12 }  // 3/4 view angle (igloo.inc style)
 
     // Debug mode
     this.debugMode = false
@@ -145,7 +146,7 @@ class IglooExperience {
       100
     )
     // Camera positioned to view igloo from front-left 3/4 angle (igloo.inc composition)
-    this.camera.position.set(4, 1.5, 7)
+    this.camera.position.set(6, 2.5, 12)
     this.scene.add(this.camera)
 
     // Renderer
@@ -223,7 +224,7 @@ class IglooExperience {
       modelLoader.applyIceMaterial(this.iceGroundModel, this.iceTextures)
 
       // Position ground below igloo (lower than igloo base)
-      this.iceGroundModel.position.y = -2.5
+      this.iceGroundModel.position.y = -5
 
       this.scene.add(this.iceGroundModel)
     }
@@ -462,7 +463,31 @@ class IglooExperience {
     } else {
       // Disable OrbitControls, use parallax
       this.controls.enabled = false
-      console.log('🔒 Parallax mode enabled - hover to view')
+
+      // Reset camera to original position with smooth animation
+      gsap.to(this.camera.position, {
+        x: this.originalCameraPosition.x,
+        y: this.originalCameraPosition.y,
+        z: this.originalCameraPosition.z,
+        duration: 1.2,
+        ease: 'power2.inOut',
+        onUpdate: () => {
+          // Keep camera looking at center during transition
+          this.camera.lookAt(0, 0, 0)
+        },
+        onComplete: () => {
+          // Reset target position for parallax
+          this.targetCameraPosition.x = this.originalCameraPosition.x
+          this.targetCameraPosition.y = this.originalCameraPosition.y
+          this.targetCameraPosition.z = this.originalCameraPosition.z
+
+          // Reset controls target
+          this.controls.target.set(0, 0, 0)
+          this.controls.update()
+
+          console.log('🔒 Parallax mode enabled - camera reset to original view')
+        }
+      })
     }
   }
 
@@ -510,13 +535,15 @@ class IglooExperience {
       this.controls.update()
     } else {
       // Parallax mode - mouse controls camera position
-      // Calculate target position based on mouse
-      this.targetCameraPosition.x = this.mouse.x * 0.5  // ±0.5 units horizontal movement
-      this.targetCameraPosition.y = 1.5 + this.mouse.y * 0.3  // ±0.3 unit vertical movement
+      // Calculate target position based on mouse (offset from original position)
+      this.targetCameraPosition.x = this.originalCameraPosition.x + this.mouse.x * 0.5  // ±0.5 units horizontal movement
+      this.targetCameraPosition.y = this.originalCameraPosition.y + this.mouse.y * 0.3  // ±0.3 unit vertical movement
+      this.targetCameraPosition.z = this.originalCameraPosition.z  // Keep Z fixed
 
       // Smooth lerp camera to target position
       this.camera.position.x += (this.targetCameraPosition.x - this.camera.position.x) * 0.05
       this.camera.position.y += (this.targetCameraPosition.y - this.camera.position.y) * 0.05
+      this.camera.position.z += (this.targetCameraPosition.z - this.camera.position.z) * 0.05
 
       // Always look at center
       this.camera.lookAt(0, 0, 0)
