@@ -68,6 +68,18 @@
         <p class="debug-hint">Lock: Camera fixed. Unlock: Adjust view, then lock to save position</p>
       </div>
 
+      <!-- Camera Lens Controls -->
+      <div class="debug-section">
+        <h3>📷 Camera Lens</h3>
+        <div class="slider-control">
+          <div class="slider-label">
+            <span>Focal Length</span>
+            <span id="focal-length-value" class="slider-value">43mm</span>
+          </div>
+          <input type="range" id="focal-length-slider" class="light-slider" min="20" max="100" value="43" step="1">
+        </div>
+      </div>
+
       <!-- Lighting Controls -->
       <div class="debug-section">
         <h3>💡 Lighting Intensity</h3>
@@ -136,8 +148,12 @@
             <span id="ground-pos">Not loaded</span>
           </div>
           <div class="info-row">
-            <span>Mountain:</span>
+            <span>Mountain 1:</span>
             <span id="mountain-pos">Not loaded</span>
+          </div>
+          <div class="info-row">
+            <span>Mountain 2:</span>
+            <span id="mountain2-pos">Not loaded</span>
           </div>
         </div>
       </div>

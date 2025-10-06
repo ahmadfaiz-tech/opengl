@@ -154,6 +154,17 @@ class IglooExperience {
       this.snowMountainModel = null
     }
 
+    // Load snow mountain model 2 (duplicate)
+    try {
+      console.log('📦 Starting to load snow mountain 2 model...')
+      this.snowMountainModel2 = await modelLoader.loadIgloo('/models/snowmountain.glb')
+      console.log('✅ Snow mountain 2 model loaded successfully!')
+    } catch (error) {
+      console.error('❌ Failed to load snow mountain 2 model:', error)
+      console.warn('⚠️  Will proceed without mountain 2 model')
+      this.snowMountainModel2 = null
+    }
+
     await this.loadingManager.simulateProgress(500)
   }
 
@@ -200,6 +211,18 @@ class IglooExperience {
       // Default camera position (igloo.inc composition - front-left 3/4 angle)
       this.camera.position.set(6, 2.5, 12)
       console.log('Using default camera position')
+    }
+
+    // Load saved focal length (affects FOV)
+    const savedFocalLength = localStorage.getItem('focalLength')
+    if (savedFocalLength) {
+      const focalLength = parseFloat(savedFocalLength)
+      const fov = this.focalLengthToFOV(focalLength)
+      this.camera.fov = fov
+      this.camera.updateProjectionMatrix()
+      console.log(`✅ Loaded saved focal length: ${focalLength.toFixed(0)}mm (FOV: ${fov.toFixed(1)}°)`)
+    } else {
+      console.log('Using default focal length: 43mm (FOV: 50°)')
     }
 
     this.scene.add(this.camera)
@@ -298,7 +321,17 @@ class IglooExperience {
       const mountainIntersects = this.raycaster.intersectObject(this.snowMountainModel, true)
       if (mountainIntersects.length > 0) {
         this.selectObject(this.snowMountainModel, 'mountain')
-        console.log('✓ Snow mountain selected')
+        console.log('✓ Snow mountain 1 selected')
+        return
+      }
+    }
+
+    // Check intersection with snow mountain 2
+    if (this.snowMountainModel2) {
+      const mountain2Intersects = this.raycaster.intersectObject(this.snowMountainModel2, true)
+      if (mountain2Intersects.length > 0) {
+        this.selectObject(this.snowMountainModel2, 'mountain2')
+        console.log('✓ Snow mountain 2 selected')
         return
       }
     }
@@ -371,6 +404,31 @@ class IglooExperience {
       this.scene.add(this.snowMountainModel)
     } else {
       console.warn('⚠️ Snow mountain model not loaded')
+    }
+
+    // Add snow mountain 2 model if loaded
+    if (this.snowMountainModel2) {
+      console.log('⛰️ Adding snow mountain 2 model')
+
+      // Apply ice material to mountain 2
+      modelLoader.applyIceMaterial(this.snowMountainModel2, this.iceTextures)
+
+      // Load saved position and rotation from localStorage
+      const savedData2 = this.loadMountain2Transform()
+      if (savedData2) {
+        this.snowMountainModel2.position.set(savedData2.position.x, savedData2.position.y, savedData2.position.z)
+        this.snowMountainModel2.rotation.set(savedData2.rotation.x, savedData2.rotation.y, savedData2.rotation.z)
+        console.log('✅ Loaded saved mountain 2 position:', savedData2.position)
+        console.log('✅ Loaded saved mountain 2 rotation:', savedData2.rotation)
+      } else {
+        // Default position (right side, opposite of mountain 1)
+        this.snowMountainModel2.position.set(8, -3, -8)
+        console.log('Using default mountain 2 position')
+      }
+
+      this.scene.add(this.snowMountainModel2)
+    } else {
+      console.warn('⚠️ Snow mountain 2 model not loaded')
     }
 
     // Use 3D model if loaded, otherwise use procedural
@@ -703,7 +761,9 @@ class IglooExperience {
 
     // Update debug panel
     if (this.selectionStateEl) {
-      const displayName = objectName === 'mountain' ? 'Mountain' : 'Ice Ground'
+      const displayName = objectName === 'mountain' ? 'Mountain 1' :
+                          objectName === 'mountain2' ? 'Mountain 2' :
+                          'Ice Ground'
       this.selectionStateEl.textContent = displayName
       this.selectionStateEl.style.color = '#ff8800'
     }
@@ -717,6 +777,8 @@ class IglooExperience {
       this.saveIceGroundPosition()
     } else if (this.selectedObjectName === 'mountain' && this.snowMountainModel) {
       this.saveMountainTransform()
+    } else if (this.selectedObjectName === 'mountain2' && this.snowMountainModel2) {
+      this.saveMountain2Transform()
     }
 
     this.selectedObject = null
@@ -823,6 +885,52 @@ class IglooExperience {
     console.log('🔄 Mountain transform reset to default')
   }
 
+  saveMountain2Transform() {
+    if (!this.snowMountainModel2) return
+
+    const transform = {
+      position: {
+        x: this.snowMountainModel2.position.x,
+        y: this.snowMountainModel2.position.y,
+        z: this.snowMountainModel2.position.z
+      },
+      rotation: {
+        x: this.snowMountainModel2.rotation.x,
+        y: this.snowMountainModel2.rotation.y,
+        z: this.snowMountainModel2.rotation.z
+      }
+    }
+
+    localStorage.setItem('mountain2Transform', JSON.stringify(transform))
+    console.log('💾 Mountain 2 position & rotation saved to localStorage:', transform)
+  }
+
+  loadMountain2Transform() {
+    const saved = localStorage.getItem('mountain2Transform')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        console.error('Failed to parse saved mountain 2 transform:', e)
+        return null
+      }
+    }
+    return null
+  }
+
+  resetMountain2Transform() {
+    if (!this.snowMountainModel2) return
+
+    // Reset to default position and rotation
+    this.snowMountainModel2.position.set(8, -3, -8)
+    this.snowMountainModel2.rotation.set(0, 0, 0)
+
+    // Clear localStorage
+    localStorage.removeItem('mountain2Transform')
+
+    console.log('🔄 Mountain 2 transform reset to default')
+  }
+
   saveLockedCameraPosition() {
     if (!this.camera) return
 
@@ -901,6 +1009,16 @@ class IglooExperience {
       console.log('📍 Locked position:', this.lockedCameraPosition)
       console.log('🎯 Locked target:', this.lockedCameraTarget)
     }
+  }
+
+  focalLengthToFOV(focalLength) {
+    const sensorWidth = 36 // 35mm full-frame sensor width
+    return 2 * Math.atan(sensorWidth / (2 * focalLength)) * (180 / Math.PI)
+  }
+
+  fovToFocalLength(fov) {
+    const sensorWidth = 36
+    return sensorWidth / (2 * Math.tan(fov * Math.PI / 360))
   }
 
   setupLightingControls() {
@@ -1040,6 +1158,7 @@ class IglooExperience {
     this.iglooPosEl = document.getElementById('igloo-pos')
     this.groundPosEl = document.getElementById('ground-pos')
     this.mountainPosEl = document.getElementById('mountain-pos')
+    this.mountain2PosEl = document.getElementById('mountain2-pos')
     this.fpsCounterEl = document.getElementById('fps-counter')
     this.selectionStateEl = document.getElementById('selection-state')
 
@@ -1066,6 +1185,35 @@ class IglooExperience {
 
     // Lighting sliders
     this.setupLightingControls()
+
+    // Focal length slider
+    const focalLengthSlider = document.getElementById('focal-length-slider')
+    const focalLengthValue = document.getElementById('focal-length-value')
+
+    if (focalLengthSlider && focalLengthValue) {
+      // Load saved or calculate from current FOV
+      const savedFocalLength = localStorage.getItem('focalLength')
+      const initialFocalLength = savedFocalLength ? parseFloat(savedFocalLength) :
+                                 this.fovToFocalLength(this.camera.fov)
+
+      focalLengthSlider.value = initialFocalLength
+      focalLengthValue.textContent = initialFocalLength.toFixed(0) + 'mm'
+
+      focalLengthSlider.addEventListener('input', (e) => {
+        const focalLength = parseFloat(e.target.value)
+        focalLengthValue.textContent = focalLength.toFixed(0) + 'mm'
+
+        // Convert to FOV and update camera
+        const newFOV = this.focalLengthToFOV(focalLength)
+        this.camera.fov = newFOV
+        this.camera.updateProjectionMatrix()
+
+        // Save to localStorage
+        localStorage.setItem('focalLength', focalLength)
+
+        console.log(`📷 Focal length: ${focalLength.toFixed(0)}mm (FOV: ${newFOV.toFixed(1)}°)`)
+      })
+    }
 
     // Save/Reset position buttons
     const saveBtn = document.getElementById('save-position-btn')
@@ -1291,6 +1439,13 @@ class IglooExperience {
       this.mountainPosEl.textContent = `${this.snowMountainModel.position.x.toFixed(2)}, ${this.snowMountainModel.position.y.toFixed(2)}, ${this.snowMountainModel.position.z.toFixed(2)}`
     } else {
       this.mountainPosEl.textContent = 'Not loaded'
+    }
+
+    // Update mountain 2 position
+    if (this.snowMountainModel2) {
+      this.mountain2PosEl.textContent = `${this.snowMountainModel2.position.x.toFixed(2)}, ${this.snowMountainModel2.position.y.toFixed(2)}, ${this.snowMountainModel2.position.z.toFixed(2)}`
+    } else {
+      this.mountain2PosEl.textContent = 'Not loaded'
     }
 
     // Update FPS
