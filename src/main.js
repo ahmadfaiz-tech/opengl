@@ -96,6 +96,17 @@ class IglooExperience {
       this.iglooModel = null
     }
 
+    // Load ice ground model
+    try {
+      console.log('📦 Starting to load ice ground model...')
+      this.iceGroundModel = await modelLoader.loadIgloo('/models/ice_ground.glb')
+      console.log('✅ Ice ground model loaded successfully!')
+    } catch (error) {
+      console.error('❌ Failed to load ice ground model:', error)
+      console.warn('⚠️  Will proceed without ground model')
+      this.iceGroundModel = null
+    }
+
     await this.loadingManager.simulateProgress(500)
   }
 
@@ -193,6 +204,19 @@ class IglooExperience {
   createIceScene() {
     const terrainGen = new TerrainGenerator()
     const modelLoader = new ModelLoader()
+
+    // Add ice ground model if loaded
+    if (this.iceGroundModel) {
+      console.log('🌍 Adding ice ground model')
+
+      // Apply ice material to ground
+      modelLoader.applyIceMaterial(this.iceGroundModel, this.iceTextures)
+
+      // Position ground below igloo (lower than igloo base)
+      this.iceGroundModel.position.y = -2.5
+
+      this.scene.add(this.iceGroundModel)
+    }
 
     // Use 3D model if loaded, otherwise use procedural
     if (this.iglooModel) {
@@ -346,8 +370,8 @@ class IglooExperience {
 
     // Mouse parallax effect on camera (igloo.inc style)
     // Calculate target position based on mouse
-    this.targetCameraPosition.x = this.mouse.x * 2  // ±2 units horizontal movement
-    this.targetCameraPosition.y = 1.5 + this.mouse.y * 1  // ±1 unit vertical movement
+    this.targetCameraPosition.x = this.mouse.x * 0.5  // ±0.5 units horizontal movement
+    this.targetCameraPosition.y = 1.5 + this.mouse.y * 0.3  // ±0.3 unit vertical movement
 
     // Smooth lerp camera to target position
     this.camera.position.x += (this.targetCameraPosition.x - this.camera.position.x) * 0.05
