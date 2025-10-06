@@ -37,6 +37,10 @@ class IglooExperience {
     this.clock = new THREE.Clock()
     this.isReady = false
 
+    // Mouse tracking for parallax effect
+    this.mouse = { x: 0, y: 0 }
+    this.targetCameraPosition = { x: 4, y: 1.5, z: 7 }  // 3/4 view angle (igloo.inc style)
+
     // Initialize
     this.initWithLoading()
   }
@@ -115,15 +119,15 @@ class IglooExperience {
     // Scene
     this.scene = new THREE.Scene()
 
-    // Camera (igloo.inc style - lower angle, dramatic composition)
+    // Camera (igloo.inc style - 3/4 view angle)
     this.camera = new THREE.PerspectiveCamera(
       50,  // Slightly narrower FOV for more dramatic look
       this.sizes.width / this.sizes.height,
       0.1,
       100
     )
-    // Camera positioned to view igloo from front-side angle
-    this.camera.position.set(5, 1.5, 8)
+    // Camera positioned to view igloo from front-left 3/4 angle (igloo.inc composition)
+    this.camera.position.set(4, 1.5, 7)
     this.scene.add(this.camera)
 
     // Renderer
@@ -151,17 +155,17 @@ class IglooExperience {
       console.log('⚠️  No HDRI - using gradient background')
     }
 
-    // Controls (igloo.inc style)
+    // Controls (igloo.inc style - no auto-rotate for scroll experience)
     this.controls = new OrbitControls(this.camera, this.canvas)
     this.controls.enableDamping = true
     this.controls.dampingFactor = 0.08
     this.controls.minDistance = 4
     this.controls.maxDistance = 20
-    this.controls.minPolarAngle = Math.PI / 6  // Can look higher
+    this.controls.minPolarAngle = Math.PI / 6
     this.controls.maxPolarAngle = Math.PI / 2 + 0.3
-    this.controls.autoRotate = true
-    this.controls.autoRotateSpeed = 0.5  // Slightly faster for better view
-    this.controls.target.set(0, 0, 0)  // Look at center
+    this.controls.autoRotate = false  // Disabled for scroll-based experience
+    this.controls.enabled = false  // Will be controlled by scroll
+    this.controls.target.set(0, 0, 0)
 
     // Create Ice Blocks Scene
     this.createIceScene()
@@ -174,9 +178,16 @@ class IglooExperience {
 
     // Event Listeners
     window.addEventListener('resize', () => this.onResize())
+    window.addEventListener('mousemove', (e) => this.onMouseMove(e))
 
     // Start animation
     this.animate()
+  }
+
+  onMouseMove(event) {
+    // Normalize mouse position to -1 to 1 range
+    this.mouse.x = (event.clientX / this.sizes.width) * 2 - 1
+    this.mouse.y = -(event.clientY / this.sizes.height) * 2 + 1
   }
 
   createIceScene() {
@@ -196,12 +207,19 @@ class IglooExperience {
       // Position model
       this.iglooModel.position.y = -1.5
 
+      // Rotate igloo so entrance faces side (igloo.inc style - 3/4 view)
+      this.iglooModel.rotation.y = -Math.PI * 0.25  // -45° rotation (entrance to right)
+
       this.scene.add(this.iglooModel)
       this.iceStructure = this.iglooModel
     } else {
       console.log('🧊 Using procedural igloo structure')
       const generator = new IceBlockGenerator()
       const { group: iceStructure, blocks: iceBlocks } = generator.createIceStructure(60, this.iceTextures)
+
+      // Rotate procedural igloo too
+      iceStructure.rotation.y = -Math.PI * 0.25
+
       this.scene.add(iceStructure)
       this.iceBlocks = iceBlocks
       this.iceStructure = iceStructure
@@ -222,17 +240,7 @@ class IglooExperience {
     innerLight3.position.set(-1, -0.8, 0)
     this.scene.add(innerLight3)
 
-    // Create detailed terrain
-    const terrain = terrainGen.createTerrain(60)
-    this.scene.add(terrain)
-
-    // Create mountains background
-    const mountains = terrainGen.createMountains()
-    this.scene.add(mountains)
-
-    // Create fog layers
-    const fogLayers = terrainGen.createFogLayers()
-    this.scene.add(fogLayers)
+    // NO terrain, mountains, or fog - clean gradient background only
   }
 
   setupPostProcessing() {
@@ -336,6 +344,18 @@ class IglooExperience {
 
     const elapsedTime = this.clock.getElapsedTime()
 
+    // Mouse parallax effect on camera (igloo.inc style)
+    // Calculate target position based on mouse
+    this.targetCameraPosition.x = this.mouse.x * 2  // ±2 units horizontal movement
+    this.targetCameraPosition.y = 1.5 + this.mouse.y * 1  // ±1 unit vertical movement
+
+    // Smooth lerp camera to target position
+    this.camera.position.x += (this.targetCameraPosition.x - this.camera.position.x) * 0.05
+    this.camera.position.y += (this.targetCameraPosition.y - this.camera.position.y) * 0.05
+
+    // Always look at center
+    this.camera.lookAt(0, 0, 0)
+
     // Animate igloo (very subtle floating - no rotation to keep structure intact)
     if (this.iceStructure) {
       this.iceStructure.position.y = Math.sin(elapsedTime * 0.2) * 0.05
@@ -344,11 +364,6 @@ class IglooExperience {
     // Animate snow
     if (this.snowParticles && this.envSetup) {
       this.envSetup.animateSnow(this.snowParticles)
-    }
-
-    // Update controls
-    if (this.controls) {
-      this.controls.update()
     }
 
     // Render with post-processing
