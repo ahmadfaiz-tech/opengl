@@ -7,12 +7,15 @@ import { VignetteEffect } from 'postprocessing'
 import { NoiseEffect } from 'postprocessing'
 import { ChromaticAberrationEffect } from 'postprocessing'
 import { ToneMappingEffect } from 'postprocessing'
+import { BrightnessContrastEffect } from 'postprocessing'
+import { HueSaturationEffect } from 'postprocessing'
 import { CustomLoadingManager } from './utils/LoadingManager.js'
 import { IceBlockGenerator } from './utils/IceBlockGenerator.js'
 import { EnvironmentSetup } from './utils/EnvironmentSetup.js'
 import { AdvancedTextureLoader } from './utils/TextureLoader.js'
 import { TerrainGenerator } from './utils/TerrainGenerator.js'
 import { ModelLoader } from './utils/ModelLoader.js'
+import { ColorGradingEffect } from './utils/ColorGradingEffect.js'
 
 // Dynamic imports for code splitting
 let OrbitControls
@@ -70,11 +73,12 @@ class IglooExperience {
       innerLights: []
     }
 
-    // Lighting intensity multipliers
-    this.lightingSettings = {
-      global: 1.0,
-      ambient: 1.0,
-      inner: 1.0
+    // Layer visibility tracking
+    this.layerVisibility = {
+      ground: true,
+      mountain1: true,
+      mountain2: true,
+      mountain3: true
     }
 
     // Initialize
@@ -163,6 +167,17 @@ class IglooExperience {
       console.error('❌ Failed to load snow mountain 2 model:', error)
       console.warn('⚠️  Will proceed without mountain 2 model')
       this.snowMountainModel2 = null
+    }
+
+    // Load snow mountain model 3 (duplicate)
+    try {
+      console.log('📦 Starting to load snow mountain 3 model...')
+      this.snowMountainModel3 = await modelLoader.loadIgloo('/models/snowmountain.glb')
+      console.log('✅ Snow mountain 3 model loaded successfully!')
+    } catch (error) {
+      console.error('❌ Failed to load snow mountain 3 model:', error)
+      console.warn('⚠️  Will proceed without mountain 3 model')
+      this.snowMountainModel3 = null
     }
 
     await this.loadingManager.simulateProgress(500)
@@ -336,6 +351,16 @@ class IglooExperience {
       }
     }
 
+    // Check intersection with snow mountain 3
+    if (this.snowMountainModel3) {
+      const mountain3Intersects = this.raycaster.intersectObject(this.snowMountainModel3, true)
+      if (mountain3Intersects.length > 0) {
+        this.selectObject(this.snowMountainModel3, 'mountain3')
+        console.log('✓ Snow mountain 3 selected')
+        return
+      }
+    }
+
     // Check intersection with ice ground
     if (this.iceGroundModel) {
       const groundIntersects = this.raycaster.intersectObject(this.iceGroundModel, true)
@@ -431,6 +456,31 @@ class IglooExperience {
       console.warn('⚠️ Snow mountain 2 model not loaded')
     }
 
+    // Add snow mountain 3 model if loaded
+    if (this.snowMountainModel3) {
+      console.log('⛰️ Adding snow mountain 3 model')
+
+      // Apply ice material to mountain 3
+      modelLoader.applyIceMaterial(this.snowMountainModel3, this.iceTextures)
+
+      // Load saved position and rotation from localStorage
+      const savedData3 = this.loadMountain3Transform()
+      if (savedData3) {
+        this.snowMountainModel3.position.set(savedData3.position.x, savedData3.position.y, savedData3.position.z)
+        this.snowMountainModel3.rotation.set(savedData3.rotation.x, savedData3.rotation.y, savedData3.rotation.z)
+        console.log('✅ Loaded saved mountain 3 position:', savedData3.position)
+        console.log('✅ Loaded saved mountain 3 rotation:', savedData3.rotation)
+      } else {
+        // Default position (center back, between mountain 1 and 2)
+        this.snowMountainModel3.position.set(0, -3, -10)
+        console.log('Using default mountain 3 position')
+      }
+
+      this.scene.add(this.snowMountainModel3)
+    } else {
+      console.warn('⚠️ Snow mountain 3 model not loaded')
+    }
+
     // Use 3D model if loaded, otherwise use procedural
     if (this.iglooModel) {
       console.log('🏠 Using loaded 3D igloo model')
@@ -494,12 +544,35 @@ class IglooExperience {
       const renderPass = new RenderPass(this.scene, this.camera)
       this.composer.addPass(renderPass)
 
-      // Bloom effect (for ice edge glow - igloo.inc style)
-      const bloomEffect = new BloomEffect({
+      // Bloom effect (for ice edge glow - controllable)
+      this.bloomEffect = new BloomEffect({
         intensity: 1.2,
         luminanceThreshold: 0.2,
         luminanceSmoothing: 0.9,
         mipmapBlur: true
+      })
+
+      // Brightness/Contrast effect (Lightroom-style exposure and contrast)
+      this.brightnessContrastEffect = new BrightnessContrastEffect({
+        brightness: 0,
+        contrast: 0
+      })
+
+      // Hue/Saturation effect (Lightroom-style saturation and vibrance)
+      this.hueSaturationEffect = new HueSaturationEffect({
+        hue: 0,
+        saturation: 0
+      })
+
+      // Custom Color Grading effect (highlights, shadows, whites, blacks, temperature, tint, clarity)
+      this.colorGradingEffect = new ColorGradingEffect({
+        highlights: 0,
+        shadows: 0,
+        whites: 0,
+        blacks: 0,
+        temperature: 0,
+        tint: 0,
+        clarity: 0
       })
 
       // Vignette effect (very subtle - igloo.inc style)
@@ -519,10 +592,13 @@ class IglooExperience {
         offset: new THREE.Vector2(0.002, 0.002)
       })
 
-      // Effect pass with working effects
+      // Effect pass with all effects
       const effectPass = new EffectPass(
         this.camera,
-        bloomEffect,
+        this.brightnessContrastEffect,
+        this.hueSaturationEffect,
+        this.colorGradingEffect,
+        this.bloomEffect,
         vignetteEffect,
         noiseEffect,
         chromaticEffect
@@ -686,6 +762,22 @@ class IglooExperience {
           break
       }
 
+      // Numeric keypad 0 and . for Z-axis movement (forward/backward)
+      // Check both e.key and e.code to handle NumLock ON/OFF
+      if (e.code === 'Numpad0' || e.key === '0' || e.key === 'Insert') {
+        e.preventDefault()
+        this.selectedObject.position.z += speed  // Forward (closer to camera)
+        moved = true
+        console.log('0️⃣ Moving FORWARD')
+      }
+
+      if (e.code === 'NumpadDecimal' || e.key === '.' || e.key === 'Delete') {
+        e.preventDefault()
+        this.selectedObject.position.z -= speed  // Backward (away from camera)
+        moved = true
+        console.log('.️⃣ Moving BACKWARD')
+      }
+
       // Numeric keypad for rotation (8=pitch up, 2=pitch down, 4=yaw left, 6=yaw right)
       switch(e.key) {
         case '8':
@@ -763,6 +855,7 @@ class IglooExperience {
     if (this.selectionStateEl) {
       const displayName = objectName === 'mountain' ? 'Mountain 1' :
                           objectName === 'mountain2' ? 'Mountain 2' :
+                          objectName === 'mountain3' ? 'Mountain 3' :
                           'Ice Ground'
       this.selectionStateEl.textContent = displayName
       this.selectionStateEl.style.color = '#ff8800'
@@ -779,6 +872,8 @@ class IglooExperience {
       this.saveMountainTransform()
     } else if (this.selectedObjectName === 'mountain2' && this.snowMountainModel2) {
       this.saveMountain2Transform()
+    } else if (this.selectedObjectName === 'mountain3' && this.snowMountainModel3) {
+      this.saveMountain3Transform()
     }
 
     this.selectedObject = null
@@ -931,6 +1026,52 @@ class IglooExperience {
     console.log('🔄 Mountain 2 transform reset to default')
   }
 
+  saveMountain3Transform() {
+    if (!this.snowMountainModel3) return
+
+    const transform = {
+      position: {
+        x: this.snowMountainModel3.position.x,
+        y: this.snowMountainModel3.position.y,
+        z: this.snowMountainModel3.position.z
+      },
+      rotation: {
+        x: this.snowMountainModel3.rotation.x,
+        y: this.snowMountainModel3.rotation.y,
+        z: this.snowMountainModel3.rotation.z
+      }
+    }
+
+    localStorage.setItem('mountain3Transform', JSON.stringify(transform))
+    console.log('💾 Mountain 3 position & rotation saved to localStorage:', transform)
+  }
+
+  loadMountain3Transform() {
+    const saved = localStorage.getItem('mountain3Transform')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        console.error('Failed to parse saved mountain 3 transform:', e)
+        return null
+      }
+    }
+    return null
+  }
+
+  resetMountain3Transform() {
+    if (!this.snowMountainModel3) return
+
+    // Reset to default position and rotation
+    this.snowMountainModel3.position.set(0, -3, -10)
+    this.snowMountainModel3.rotation.set(0, 0, 0)
+
+    // Clear localStorage
+    localStorage.removeItem('mountain3Transform')
+
+    console.log('🔄 Mountain 3 transform reset to default')
+  }
+
   saveLockedCameraPosition() {
     if (!this.camera) return
 
@@ -1021,129 +1162,540 @@ class IglooExperience {
     return sensorWidth / (2 * Math.tan(fov * Math.PI / 360))
   }
 
-  setupLightingControls() {
-    // Get slider elements
-    const globalSlider = document.getElementById('global-light-slider')
-    const ambientSlider = document.getElementById('ambient-light-slider')
-    const innerSlider = document.getElementById('inner-light-slider')
-
-    const globalValue = document.getElementById('global-light-value')
-    const ambientValue = document.getElementById('ambient-light-value')
-    const innerValue = document.getElementById('inner-light-value')
-
-    const resetLightingBtn = document.getElementById('reset-lighting-btn')
-
-    // Load saved settings
-    const saved = this.loadLightingSettings()
-    if (saved) {
-      this.lightingSettings = saved
-      globalSlider.value = saved.global * 100
-      ambientSlider.value = saved.ambient * 100
-      innerSlider.value = saved.inner * 100
-      this.applyLightingSettings()
-    }
-
-    // Global light slider
-    globalSlider.addEventListener('input', (e) => {
-      const value = e.target.value / 100
-      globalValue.textContent = `${e.target.value}%`
-      this.lightingSettings.global = value
-      this.applyLightingSettings()
-      this.saveLightingSettings()
-    })
-
-    // Ambient light slider
-    ambientSlider.addEventListener('input', (e) => {
-      const value = e.target.value / 100
-      ambientValue.textContent = `${e.target.value}%`
-      this.lightingSettings.ambient = value
-      this.applyLightingSettings()
-      this.saveLightingSettings()
-    })
-
-    // Inner light slider
-    innerSlider.addEventListener('input', (e) => {
-      const value = e.target.value / 100
-      innerValue.textContent = `${e.target.value}%`
-      this.lightingSettings.inner = value
-      this.applyLightingSettings()
-      this.saveLightingSettings()
-    })
-
-    // Reset lighting button
-    if (resetLightingBtn) {
-      resetLightingBtn.addEventListener('click', () => {
-        this.lightingSettings = { global: 1.0, ambient: 1.0, inner: 1.0 }
-        globalSlider.value = 100
-        ambientSlider.value = 100
-        innerSlider.value = 100
-        globalValue.textContent = '100%'
-        ambientValue.textContent = '100%'
-        innerValue.textContent = '100%'
-        this.applyLightingSettings()
-        this.saveLightingSettings()
-        console.log('🔄 Lighting reset to default')
-      })
+  getObjectByName(name) {
+    switch(name) {
+      case 'ground': return this.iceGroundModel
+      case 'mountain1': return this.snowMountainModel
+      case 'mountain2': return this.snowMountainModel2
+      case 'mountain3': return this.snowMountainModel3
+      default: return null
     }
   }
 
-  applyLightingSettings() {
-    // Apply global multiplier to all lights except inner lights
-    const globalMult = this.lightingSettings.global
-    const ambientMult = this.lightingSettings.ambient
-    const innerMult = this.lightingSettings.inner
+  toggleLayerVisibility(objectName) {
+    this.layerVisibility[objectName] = !this.layerVisibility[objectName]
 
-    // Ambient light
+    // Update object visibility
+    const object = this.getObjectByName(objectName)
+    if (object) {
+      object.visible = this.layerVisibility[objectName]
+    }
+
+    // Update eye icon
+    const btn = document.querySelector(`.layer-visibility[data-object="${objectName}"]`)
+    if (btn) {
+      btn.classList.toggle('hidden', !this.layerVisibility[objectName])
+    }
+
+    // Save to localStorage
+    localStorage.setItem('layerVisibility', JSON.stringify(this.layerVisibility))
+
+    console.log(`👁️ ${objectName} visibility:`, this.layerVisibility[objectName])
+  }
+
+  selectLayerObject(objectName) {
+    const object = this.getObjectByName(objectName)
+    if (object && object.visible) {
+      // Map layer objectName to internal object names
+      const internalName = objectName === 'ground' ? 'ground' :
+                          objectName === 'mountain1' ? 'mountain' :
+                          objectName === 'mountain2' ? 'mountain2' :
+                          'mountain3'
+      this.selectObject(object, internalName)
+
+      // Highlight layer
+      document.querySelectorAll('.layer-item').forEach(item => {
+        item.classList.remove('selected')
+      })
+      const layerItem = document.querySelector(`.layer-item[data-object="${objectName}"]`)
+      if (layerItem) {
+        layerItem.classList.add('selected')
+      }
+
+      console.log(`🎯 Selected ${objectName} from layer panel`)
+    }
+  }
+
+  applyLayerVisibility() {
+    // Apply saved visibility states to objects
+    Object.keys(this.layerVisibility).forEach(objectName => {
+      const object = this.getObjectByName(objectName)
+      if (object) {
+        object.visible = this.layerVisibility[objectName]
+      }
+
+      // Update eye icon
+      const btn = document.querySelector(`.layer-visibility[data-object="${objectName}"]`)
+      if (btn) {
+        btn.classList.toggle('hidden', !this.layerVisibility[objectName])
+      }
+    })
+  }
+
+  setupLayerPanel() {
+    // Load saved visibility
+    const savedVisibility = localStorage.getItem('layerVisibility')
+    if (savedVisibility) {
+      this.layerVisibility = JSON.parse(savedVisibility)
+      this.applyLayerVisibility()
+    }
+
+    // Eye icon click - toggle visibility
+    document.querySelectorAll('.layer-visibility:not([disabled])').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation()
+        const objectName = btn.dataset.object
+        this.toggleLayerVisibility(objectName)
+      })
+    })
+
+    // Layer item click - select object
+    document.querySelectorAll('.layer-item:not(.locked)').forEach(item => {
+      item.addEventListener('click', () => {
+        const objectName = item.dataset.object
+        this.selectLayerObject(objectName)
+      })
+    })
+
+    console.log('✅ Layer panel setup complete!')
+  }
+
+  setupGlobalLighting() {
+    const globalSlider = document.getElementById('global-light-slider')
+    const globalValue = document.getElementById('global-light-value')
+
+    if (!globalSlider || !globalValue) return
+
+    // Load saved setting
+    const saved = localStorage.getItem('globalLighting')
+    if (saved) {
+      const value = parseFloat(saved)
+      globalSlider.value = Math.round(value * 100)
+      globalValue.textContent = `${Math.round(value * 100)}%`
+      this.applyGlobalLighting(value)
+    }
+
+    // Slider event
+    globalSlider.addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value) / 100
+      globalValue.textContent = `${e.target.value}%`
+      this.applyGlobalLighting(value)
+      localStorage.setItem('globalLighting', value)
+    })
+
+    console.log('✅ Global lighting control setup complete!')
+  }
+
+  applyGlobalLighting(multiplier) {
+    // Apply to all lights
     if (this.sceneLights.ambient) {
       this.sceneLights.ambient.intensity =
-        (this.sceneLights.ambient.userData.baseIntensity || 0.2) * globalMult * ambientMult
+        (this.sceneLights.ambient.userData.baseIntensity || 0.2) * multiplier
     }
 
-    // Hemisphere light
     if (this.sceneLights.hemisphere) {
       this.sceneLights.hemisphere.intensity =
-        (this.sceneLights.hemisphere.userData.baseIntensity || 0.4) * globalMult
+        (this.sceneLights.hemisphere.userData.baseIntensity || 0.4) * multiplier
     }
 
-    // Directional lights
     this.sceneLights.directional.forEach(light => {
       if (light.userData.baseIntensity !== undefined) {
-        light.intensity = light.userData.baseIntensity * globalMult
+        light.intensity = light.userData.baseIntensity * multiplier
       }
     })
 
-    // Point lights (environment)
     this.sceneLights.point.forEach(light => {
       if (light.userData.baseIntensity !== undefined) {
-        light.intensity = light.userData.baseIntensity * globalMult
+        light.intensity = light.userData.baseIntensity * multiplier
       }
     })
 
-    // Inner lights (separate control)
     this.sceneLights.innerLights.forEach(light => {
       if (light.userData.baseIntensity !== undefined) {
-        light.intensity = light.userData.baseIntensity * globalMult * innerMult
+        light.intensity = light.userData.baseIntensity * multiplier
       }
     })
-
-    console.log('💡 Lighting updated:', this.lightingSettings)
   }
 
-  saveLightingSettings() {
-    localStorage.setItem('lightingSettings', JSON.stringify(this.lightingSettings))
+  setupPostProcessingControls() {
+    // Get slider elements
+    const exposureSlider = document.getElementById('exposure-slider')
+    const contrastSlider = document.getElementById('contrast-slider')
+    const highlightsSlider = document.getElementById('highlights-slider')
+    const shadowsSlider = document.getElementById('shadows-slider')
+    const whitesSlider = document.getElementById('whites-slider')
+    const blacksSlider = document.getElementById('blacks-slider')
+    const temperatureSlider = document.getElementById('temperature-slider')
+    const tintSlider = document.getElementById('tint-slider')
+    const saturationSlider = document.getElementById('saturation-slider')
+    const vibranceSlider = document.getElementById('vibrance-slider')
+    const claritySlider = document.getElementById('clarity-slider')
+    const bloomSlider = document.getElementById('bloom-slider')
+
+    // Get value display elements
+    const exposureValue = document.getElementById('exposure-value')
+    const contrastValue = document.getElementById('contrast-value')
+    const highlightsValue = document.getElementById('highlights-value')
+    const shadowsValue = document.getElementById('shadows-value')
+    const whitesValue = document.getElementById('whites-value')
+    const blacksValue = document.getElementById('blacks-value')
+    const temperatureValue = document.getElementById('temperature-value')
+    const tintValue = document.getElementById('tint-value')
+    const saturationValue = document.getElementById('saturation-value')
+    const vibranceValue = document.getElementById('vibrance-value')
+    const clarityValue = document.getElementById('clarity-value')
+    const bloomValue = document.getElementById('bloom-value')
+
+    const resetBtn = document.getElementById('reset-postprocessing-btn')
+
+    // Load saved settings or use defaults
+    const saved = this.loadPostProcessingSettings()
+    if (saved) {
+      this.applyPostProcessingSettings(saved, {
+        exposureSlider, contrastSlider, highlightsSlider, shadowsSlider,
+        whitesSlider, blacksSlider, temperatureSlider, tintSlider,
+        saturationSlider, vibranceSlider, claritySlider, bloomSlider,
+        exposureValue, contrastValue, highlightsValue, shadowsValue,
+        whitesValue, blacksValue, temperatureValue, tintValue,
+        saturationValue, vibranceValue, clarityValue, bloomValue
+      })
+    }
+
+    // Exposure slider
+    exposureSlider.addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value) / 100  // -2.0 to +2.0
+      exposureValue.textContent = value.toFixed(1)
+      if (this.brightnessContrastEffect) {
+        this.brightnessContrastEffect.brightness = value
+      }
+      this.savePostProcessingSettings()
+    })
+
+    // Contrast slider
+    contrastSlider.addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value) / 100  // -1.0 to +1.0
+      contrastValue.textContent = e.target.value
+      if (this.brightnessContrastEffect) {
+        this.brightnessContrastEffect.contrast = value
+      }
+      this.savePostProcessingSettings()
+    })
+
+    // Highlights slider
+    highlightsSlider.addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value)
+      highlightsValue.textContent = e.target.value
+      if (this.colorGradingEffect) {
+        this.colorGradingEffect.highlights = value
+      }
+      this.savePostProcessingSettings()
+    })
+
+    // Shadows slider
+    shadowsSlider.addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value)
+      shadowsValue.textContent = e.target.value
+      if (this.colorGradingEffect) {
+        this.colorGradingEffect.shadows = value
+      }
+      this.savePostProcessingSettings()
+    })
+
+    // Whites slider
+    whitesSlider.addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value)
+      whitesValue.textContent = e.target.value
+      if (this.colorGradingEffect) {
+        this.colorGradingEffect.whites = value
+      }
+      this.savePostProcessingSettings()
+    })
+
+    // Blacks slider
+    blacksSlider.addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value)
+      blacksValue.textContent = e.target.value
+      if (this.colorGradingEffect) {
+        this.colorGradingEffect.blacks = value
+      }
+      this.savePostProcessingSettings()
+    })
+
+    // Temperature slider
+    temperatureSlider.addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value) / 100  // -1.0 to +1.0
+      temperatureValue.textContent = e.target.value
+      if (this.colorGradingEffect) {
+        this.colorGradingEffect.temperature = value
+      }
+      this.savePostProcessingSettings()
+    })
+
+    // Tint slider
+    tintSlider.addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value) / 100  // -1.0 to +1.0
+      tintValue.textContent = e.target.value
+      if (this.colorGradingEffect) {
+        this.colorGradingEffect.tint = value
+      }
+      this.savePostProcessingSettings()
+    })
+
+    // Saturation slider
+    saturationSlider.addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value) / 100  // -1.0 to +1.0
+      saturationValue.textContent = e.target.value
+      if (this.hueSaturationEffect) {
+        this.hueSaturationEffect.saturation = value
+      }
+      this.savePostProcessingSettings()
+    })
+
+    // Vibrance slider (using saturation for now - vibrance is similar)
+    vibranceSlider.addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value) / 100  // -1.0 to +1.0
+      vibranceValue.textContent = e.target.value
+      // Vibrance is a more subtle saturation - we can combine it with saturation
+      // For now, we'll just use it as an additional saturation control
+      // In a more advanced implementation, vibrance would affect only less-saturated colors
+      this.savePostProcessingSettings()
+    })
+
+    // Clarity slider
+    claritySlider.addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value) / 100  // 0 to 1.0
+      clarityValue.textContent = e.target.value
+      if (this.colorGradingEffect) {
+        this.colorGradingEffect.clarity = value
+      }
+      this.savePostProcessingSettings()
+    })
+
+    // Bloom slider
+    bloomSlider.addEventListener('input', (e) => {
+      const value = parseFloat(e.target.value) / 100  // 0 to 3.0
+      bloomValue.textContent = e.target.value
+      if (this.bloomEffect) {
+        this.bloomEffect.intensity = value
+      }
+      this.savePostProcessingSettings()
+    })
+
+    // Reset button
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        // Reset all sliders to default
+        exposureSlider.value = 0
+        contrastSlider.value = 0
+        highlightsSlider.value = 0
+        shadowsSlider.value = 0
+        whitesSlider.value = 0
+        blacksSlider.value = 0
+        temperatureSlider.value = 0
+        tintSlider.value = 0
+        saturationSlider.value = 0
+        vibranceSlider.value = 0
+        claritySlider.value = 0
+        bloomSlider.value = 120  // Default bloom intensity
+
+        // Update values
+        exposureValue.textContent = '0.0'
+        contrastValue.textContent = '0'
+        highlightsValue.textContent = '0'
+        shadowsValue.textContent = '0'
+        whitesValue.textContent = '0'
+        blacksValue.textContent = '0'
+        temperatureValue.textContent = '0'
+        tintValue.textContent = '0'
+        saturationValue.textContent = '0'
+        vibranceValue.textContent = '0'
+        clarityValue.textContent = '0'
+        bloomValue.textContent = '120'
+
+        // Apply to effects
+        if (this.brightnessContrastEffect) {
+          this.brightnessContrastEffect.brightness = 0
+          this.brightnessContrastEffect.contrast = 0
+        }
+        if (this.hueSaturationEffect) {
+          this.hueSaturationEffect.saturation = 0
+        }
+        if (this.colorGradingEffect) {
+          this.colorGradingEffect.highlights = 0
+          this.colorGradingEffect.shadows = 0
+          this.colorGradingEffect.whites = 0
+          this.colorGradingEffect.blacks = 0
+          this.colorGradingEffect.temperature = 0
+          this.colorGradingEffect.tint = 0
+          this.colorGradingEffect.clarity = 0
+        }
+        if (this.bloomEffect) {
+          this.bloomEffect.intensity = 1.2
+        }
+
+        this.savePostProcessingSettings()
+        console.log('🔄 Post-processing reset to defaults')
+      })
+    }
+
+    console.log('✅ Post-processing controls setup complete!')
   }
 
-  loadLightingSettings() {
-    const saved = localStorage.getItem('lightingSettings')
+  savePostProcessingSettings() {
+    const settings = {
+      exposure: this.brightnessContrastEffect ? this.brightnessContrastEffect.brightness : 0,
+      contrast: this.brightnessContrastEffect ? this.brightnessContrastEffect.contrast : 0,
+      highlights: this.colorGradingEffect ? this.colorGradingEffect.highlights : 0,
+      shadows: this.colorGradingEffect ? this.colorGradingEffect.shadows : 0,
+      whites: this.colorGradingEffect ? this.colorGradingEffect.whites : 0,
+      blacks: this.colorGradingEffect ? this.colorGradingEffect.blacks : 0,
+      temperature: this.colorGradingEffect ? this.colorGradingEffect.temperature : 0,
+      tint: this.colorGradingEffect ? this.colorGradingEffect.tint : 0,
+      saturation: this.hueSaturationEffect ? this.hueSaturationEffect.saturation : 0,
+      vibrance: 0,  // Not currently implemented
+      clarity: this.colorGradingEffect ? this.colorGradingEffect.clarity : 0,
+      bloom: this.bloomEffect ? this.bloomEffect.intensity : 1.2
+    }
+    localStorage.setItem('postProcessingSettings', JSON.stringify(settings))
+  }
+
+  loadPostProcessingSettings() {
+    const saved = localStorage.getItem('postProcessingSettings')
     if (saved) {
       try {
         return JSON.parse(saved)
       } catch (e) {
-        console.error('Failed to parse saved lighting settings:', e)
+        console.error('Failed to parse saved post-processing settings:', e)
         return null
       }
     }
     return null
+  }
+
+  applyPostProcessingSettings(settings, elements) {
+    const {
+      exposureSlider, contrastSlider, highlightsSlider, shadowsSlider,
+      whitesSlider, blacksSlider, temperatureSlider, tintSlider,
+      saturationSlider, vibranceSlider, claritySlider, bloomSlider,
+      exposureValue, contrastValue, highlightsValue, shadowsValue,
+      whitesValue, blacksValue, temperatureValue, tintValue,
+      saturationValue, vibranceValue, clarityValue, bloomValue
+    } = elements
+
+    // Apply exposure
+    if (settings.exposure !== undefined) {
+      const sliderValue = Math.round(settings.exposure * 100)
+      exposureSlider.value = sliderValue
+      exposureValue.textContent = settings.exposure.toFixed(1)
+      if (this.brightnessContrastEffect) {
+        this.brightnessContrastEffect.brightness = settings.exposure
+      }
+    }
+
+    // Apply contrast
+    if (settings.contrast !== undefined) {
+      const sliderValue = Math.round(settings.contrast * 100)
+      contrastSlider.value = sliderValue
+      contrastValue.textContent = sliderValue
+      if (this.brightnessContrastEffect) {
+        this.brightnessContrastEffect.contrast = settings.contrast
+      }
+    }
+
+    // Apply highlights
+    if (settings.highlights !== undefined) {
+      highlightsSlider.value = settings.highlights
+      highlightsValue.textContent = settings.highlights
+      if (this.colorGradingEffect) {
+        this.colorGradingEffect.highlights = settings.highlights
+      }
+    }
+
+    // Apply shadows
+    if (settings.shadows !== undefined) {
+      shadowsSlider.value = settings.shadows
+      shadowsValue.textContent = settings.shadows
+      if (this.colorGradingEffect) {
+        this.colorGradingEffect.shadows = settings.shadows
+      }
+    }
+
+    // Apply whites
+    if (settings.whites !== undefined) {
+      whitesSlider.value = settings.whites
+      whitesValue.textContent = settings.whites
+      if (this.colorGradingEffect) {
+        this.colorGradingEffect.whites = settings.whites
+      }
+    }
+
+    // Apply blacks
+    if (settings.blacks !== undefined) {
+      blacksSlider.value = settings.blacks
+      blacksValue.textContent = settings.blacks
+      if (this.colorGradingEffect) {
+        this.colorGradingEffect.blacks = settings.blacks
+      }
+    }
+
+    // Apply temperature
+    if (settings.temperature !== undefined) {
+      const sliderValue = Math.round(settings.temperature * 100)
+      temperatureSlider.value = sliderValue
+      temperatureValue.textContent = sliderValue
+      if (this.colorGradingEffect) {
+        this.colorGradingEffect.temperature = settings.temperature
+      }
+    }
+
+    // Apply tint
+    if (settings.tint !== undefined) {
+      const sliderValue = Math.round(settings.tint * 100)
+      tintSlider.value = sliderValue
+      tintValue.textContent = sliderValue
+      if (this.colorGradingEffect) {
+        this.colorGradingEffect.tint = settings.tint
+      }
+    }
+
+    // Apply saturation
+    if (settings.saturation !== undefined) {
+      const sliderValue = Math.round(settings.saturation * 100)
+      saturationSlider.value = sliderValue
+      saturationValue.textContent = sliderValue
+      if (this.hueSaturationEffect) {
+        this.hueSaturationEffect.saturation = settings.saturation
+      }
+    }
+
+    // Apply vibrance
+    if (settings.vibrance !== undefined) {
+      const sliderValue = Math.round(settings.vibrance * 100)
+      vibranceSlider.value = sliderValue
+      vibranceValue.textContent = sliderValue
+    }
+
+    // Apply clarity
+    if (settings.clarity !== undefined) {
+      const sliderValue = Math.round(settings.clarity * 100)
+      claritySlider.value = sliderValue
+      clarityValue.textContent = sliderValue
+      if (this.colorGradingEffect) {
+        this.colorGradingEffect.clarity = settings.clarity
+      }
+    }
+
+    // Apply bloom
+    if (settings.bloom !== undefined) {
+      const sliderValue = Math.round(settings.bloom * 100)
+      bloomSlider.value = sliderValue
+      bloomValue.textContent = sliderValue
+      if (this.bloomEffect) {
+        this.bloomEffect.intensity = settings.bloom
+      }
+    }
+
+    console.log('✅ Post-processing settings loaded and applied')
   }
 
   initDebugPanel() {
@@ -1159,6 +1711,7 @@ class IglooExperience {
     this.groundPosEl = document.getElementById('ground-pos')
     this.mountainPosEl = document.getElementById('mountain-pos')
     this.mountain2PosEl = document.getElementById('mountain2-pos')
+    this.mountain3PosEl = document.getElementById('mountain3-pos')
     this.fpsCounterEl = document.getElementById('fps-counter')
     this.selectionStateEl = document.getElementById('selection-state')
 
@@ -1183,8 +1736,14 @@ class IglooExperience {
       this.toggleCameraLock(e.target.checked)
     })
 
-    // Lighting sliders
-    this.setupLightingControls()
+    // Layer panel
+    this.setupLayerPanel()
+
+    // Global lighting control
+    this.setupGlobalLighting()
+
+    // Post-processing controls
+    this.setupPostProcessingControls()
 
     // Focal length slider
     const focalLengthSlider = document.getElementById('focal-length-slider')
@@ -1446,6 +2005,13 @@ class IglooExperience {
       this.mountain2PosEl.textContent = `${this.snowMountainModel2.position.x.toFixed(2)}, ${this.snowMountainModel2.position.y.toFixed(2)}, ${this.snowMountainModel2.position.z.toFixed(2)}`
     } else {
       this.mountain2PosEl.textContent = 'Not loaded'
+    }
+
+    // Update mountain 3 position
+    if (this.snowMountainModel3) {
+      this.mountain3PosEl.textContent = `${this.snowMountainModel3.position.x.toFixed(2)}, ${this.snowMountainModel3.position.y.toFixed(2)}, ${this.snowMountainModel3.position.z.toFixed(2)}`
+    } else {
+      this.mountain3PosEl.textContent = 'Not loaded'
     }
 
     // Update FPS

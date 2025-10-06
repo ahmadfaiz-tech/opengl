@@ -365,6 +365,27 @@ body {
   font-family: 'Courier New', monospace;
 }
 
+/* Post-Processing Categories */
+.pp-category {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.pp-category:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.pp-category h4 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: normal;
+}
+
 /* Custom Range Slider */
 .light-slider {
   -webkit-appearance: none;
@@ -473,6 +494,82 @@ body {
 
 .debug-content::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+/* Layers Panel */
+.layers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.layer-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.layer-item:hover:not(.locked) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.layer-item.selected {
+  background: rgba(0, 255, 255, 0.2);
+  border: 1px solid rgba(0, 255, 255, 0.5);
+}
+
+.layer-item.locked {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.layer-visibility {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.layer-visibility:hover:not(:disabled) {
+  transform: scale(1.2);
+}
+
+.layer-visibility:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.layer-visibility.hidden .eye-icon {
+  opacity: 0.3;
+}
+
+.eye-icon {
+  transition: opacity 0.2s;
+}
+
+.layer-name {
+  flex: 1;
+  font-size: 12px;
+  user-select: none;
+}
+
+.layer-lock {
+  font-size: 12px;
+  opacity: 0.5;
 }
 
 /* Responsive */

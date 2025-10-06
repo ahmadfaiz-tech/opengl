@@ -80,39 +80,132 @@
         </div>
       </div>
 
-      <!-- Lighting Controls -->
+      <!-- Global Lighting -->
       <div class="debug-section">
-        <h3>💡 Lighting Intensity</h3>
-
-        <!-- Global Intensity -->
+        <h3>💡 Global Lighting</h3>
         <div class="slider-control">
           <div class="slider-label">
-            <span>Global</span>
+            <span>Intensity</span>
             <span id="global-light-value" class="slider-value">100%</span>
           </div>
           <input type="range" id="global-light-slider" class="light-slider" min="0" max="200" value="100" step="5">
         </div>
+      </div>
 
-        <!-- Ambient Light -->
-        <div class="slider-control">
-          <div class="slider-label">
-            <span>Ambient</span>
-            <span id="ambient-light-value" class="slider-value">100%</span>
+      <!-- Post-Processing Controls (Lightroom-style) -->
+      <div class="debug-section">
+        <h3>🎨 Post-Processing</h3>
+
+        <!-- Tone -->
+        <div class="pp-category">
+          <h4>Tone</h4>
+          <div class="slider-control">
+            <div class="slider-label">
+              <span>Exposure</span>
+              <span id="exposure-value" class="slider-value">0.0</span>
+            </div>
+            <input type="range" id="exposure-slider" class="light-slider" min="-200" max="200" value="0" step="5">
           </div>
-          <input type="range" id="ambient-light-slider" class="light-slider" min="0" max="200" value="100" step="5">
+          <div class="slider-control">
+            <div class="slider-label">
+              <span>Contrast</span>
+              <span id="contrast-value" class="slider-value">0</span>
+            </div>
+            <input type="range" id="contrast-slider" class="light-slider" min="-100" max="100" value="0" step="5">
+          </div>
         </div>
 
-        <!-- Point Lights (Inner Glow) -->
-        <div class="slider-control">
-          <div class="slider-label">
-            <span>Inner Glow</span>
-            <span id="inner-light-value" class="slider-value">100%</span>
+        <!-- Light -->
+        <div class="pp-category">
+          <h4>Light</h4>
+          <div class="slider-control">
+            <div class="slider-label">
+              <span>Highlights</span>
+              <span id="highlights-value" class="slider-value">0</span>
+            </div>
+            <input type="range" id="highlights-slider" class="light-slider" min="-100" max="100" value="0" step="5">
           </div>
-          <input type="range" id="inner-light-slider" class="light-slider" min="0" max="200" value="100" step="5">
+          <div class="slider-control">
+            <div class="slider-label">
+              <span>Shadows</span>
+              <span id="shadows-value" class="slider-value">0</span>
+            </div>
+            <input type="range" id="shadows-slider" class="light-slider" min="-100" max="100" value="0" step="5">
+          </div>
+          <div class="slider-control">
+            <div class="slider-label">
+              <span>Whites</span>
+              <span id="whites-value" class="slider-value">0</span>
+            </div>
+            <input type="range" id="whites-slider" class="light-slider" min="-100" max="100" value="0" step="5">
+          </div>
+          <div class="slider-control">
+            <div class="slider-label">
+              <span>Blacks</span>
+              <span id="blacks-value" class="slider-value">0</span>
+            </div>
+            <input type="range" id="blacks-slider" class="light-slider" min="-100" max="100" value="0" step="5">
+          </div>
         </div>
 
-        <button id="reset-lighting-btn" class="debug-action-btn" style="margin-top: 8px; width: 100%;">🔄 Reset Lighting</button>
-        <p class="debug-hint">Adjust lighting intensity (0-200%)</p>
+        <!-- Color -->
+        <div class="pp-category">
+          <h4>Color</h4>
+          <div class="slider-control">
+            <div class="slider-label">
+              <span>Temperature</span>
+              <span id="temperature-value" class="slider-value">0</span>
+            </div>
+            <input type="range" id="temperature-slider" class="light-slider" min="-100" max="100" value="0" step="5">
+          </div>
+          <div class="slider-control">
+            <div class="slider-label">
+              <span>Tint</span>
+              <span id="tint-value" class="slider-value">0</span>
+            </div>
+            <input type="range" id="tint-slider" class="light-slider" min="-100" max="100" value="0" step="5">
+          </div>
+          <div class="slider-control">
+            <div class="slider-label">
+              <span>Saturation</span>
+              <span id="saturation-value" class="slider-value">0</span>
+            </div>
+            <input type="range" id="saturation-slider" class="light-slider" min="-100" max="100" value="0" step="5">
+          </div>
+          <div class="slider-control">
+            <div class="slider-label">
+              <span>Vibrance</span>
+              <span id="vibrance-value" class="slider-value">0</span>
+            </div>
+            <input type="range" id="vibrance-slider" class="light-slider" min="-100" max="100" value="0" step="5">
+          </div>
+        </div>
+
+        <!-- Detail -->
+        <div class="pp-category">
+          <h4>Detail</h4>
+          <div class="slider-control">
+            <div class="slider-label">
+              <span>Clarity</span>
+              <span id="clarity-value" class="slider-value">0</span>
+            </div>
+            <input type="range" id="clarity-slider" class="light-slider" min="0" max="100" value="0" step="5">
+          </div>
+        </div>
+
+        <!-- Effects -->
+        <div class="pp-category">
+          <h4>Effects</h4>
+          <div class="slider-control">
+            <div class="slider-label">
+              <span>Bloom</span>
+              <span id="bloom-value" class="slider-value">120</span>
+            </div>
+            <input type="range" id="bloom-slider" class="light-slider" min="0" max="300" value="120" step="10">
+          </div>
+        </div>
+
+        <button id="reset-postprocessing-btn" class="debug-action-btn" style="margin-top: 12px; width: 100%;">🔄 Reset All</button>
       </div>
 
       <!-- Ice Ground Selection -->
@@ -155,6 +248,10 @@
             <span>Mountain 2:</span>
             <span id="mountain2-pos">Not loaded</span>
           </div>
+          <div class="info-row">
+            <span>Mountain 3:</span>
+            <span id="mountain3-pos">Not loaded</span>
+          </div>
         </div>
       </div>
 
@@ -169,39 +266,49 @@
         </div>
       </div>
 
-      <!-- Keyboard Shortcuts -->
+      <!-- Layers Panel -->
       <div class="debug-section">
-        <h3>⌨️ Shortcuts</h3>
-        <div class="debug-info shortcuts">
-          <div class="shortcut-row">
-            <kbd>D</kbd> <span>Toggle Panel</span>
+        <h3>📋 Layers</h3>
+        <div class="layers-list">
+          <!-- Igloo - Locked -->
+          <div class="layer-item locked" data-object="igloo">
+            <button class="layer-visibility" disabled title="Igloo always visible">
+              <span class="eye-icon">👁️</span>
+            </button>
+            <span class="layer-name">🏠 Igloo</span>
+            <span class="layer-lock">🔒</span>
           </div>
-          <div class="shortcut-row">
-            <kbd>R</kbd> <span>Toggle Rotation</span>
+
+          <!-- Ice Ground -->
+          <div class="layer-item" data-object="ground">
+            <button class="layer-visibility" data-object="ground">
+              <span class="eye-icon">👁️</span>
+            </button>
+            <span class="layer-name">🧊 Ice Ground</span>
           </div>
-          <div class="shortcut-row">
-            <kbd>↑</kbd> <span>Move Up</span>
+
+          <!-- Mountain 1 -->
+          <div class="layer-item" data-object="mountain1">
+            <button class="layer-visibility" data-object="mountain1">
+              <span class="eye-icon">👁️</span>
+            </button>
+            <span class="layer-name">⛰️ Mountain 1</span>
           </div>
-          <div class="shortcut-row">
-            <kbd>↓</kbd> <span>Move Down</span>
+
+          <!-- Mountain 2 -->
+          <div class="layer-item" data-object="mountain2">
+            <button class="layer-visibility" data-object="mountain2">
+              <span class="eye-icon">👁️</span>
+            </button>
+            <span class="layer-name">⛰️ Mountain 2</span>
           </div>
-          <div class="shortcut-row">
-            <kbd>←</kbd> <span>Move Left</span>
-          </div>
-          <div class="shortcut-row">
-            <kbd>→</kbd> <span>Move Right</span>
-          </div>
-          <div class="shortcut-row">
-            <kbd>8</kbd> <span>Rotate Pitch Up</span>
-          </div>
-          <div class="shortcut-row">
-            <kbd>2</kbd> <span>Rotate Pitch Down</span>
-          </div>
-          <div class="shortcut-row">
-            <kbd>4</kbd> <span>Rotate Yaw Left</span>
-          </div>
-          <div class="shortcut-row">
-            <kbd>6</kbd> <span>Rotate Yaw Right</span>
+
+          <!-- Mountain 3 -->
+          <div class="layer-item" data-object="mountain3">
+            <button class="layer-visibility" data-object="mountain3">
+              <span class="eye-icon">👁️</span>
+            </button>
+            <span class="layer-name">⛰️ Mountain 3</span>
           </div>
         </div>
       </div>
