@@ -208,7 +208,7 @@ class IglooExperience {
       this.iglooModel.position.y = -1.5
 
       // Rotate igloo so entrance faces side (igloo.inc style - 3/4 view)
-      this.iglooModel.rotation.y = -Math.PI * 0.25  // -45° rotation (entrance to right)
+      this.iglooModel.rotation.y = Math.PI * 0.25  // 45° rotation (entrance to right)
 
       this.scene.add(this.iglooModel)
       this.iceStructure = this.iglooModel
@@ -218,7 +218,7 @@ class IglooExperience {
       const { group: iceStructure, blocks: iceBlocks } = generator.createIceStructure(60, this.iceTextures)
 
       // Rotate procedural igloo too
-      iceStructure.rotation.y = -Math.PI * 0.25
+      iceStructure.rotation.y = Math.PI * 0.25
 
       this.scene.add(iceStructure)
       this.iceBlocks = iceBlocks

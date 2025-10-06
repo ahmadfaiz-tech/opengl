@@ -75,10 +75,10 @@ body {
 /* UI Overlay */
 #ui-overlay {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
+  top: 50px;
+  left: 70px;
+  transform: none;
+  text-align: left;
   z-index: 10;
   pointer-events: none;
   opacity: 0;
