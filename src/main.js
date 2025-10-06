@@ -1,16 +1,27 @@
 import * as THREE from 'three'
-import vertexShader from './shaders/vertexShader.glsl?raw'
-import fragmentShader from './shaders/fragmentShader.glsl?raw'
-import { CustomLoadingManager, ShaderPreloader } from './utils/LoadingManager.js'
+import { EffectComposer } from 'postprocessing'
+import { RenderPass } from 'postprocessing'
+import { EffectPass } from 'postprocessing'
+import { BloomEffect } from 'postprocessing'
+import { VignetteEffect } from 'postprocessing'
+import { NoiseEffect } from 'postprocessing'
+import { ChromaticAberrationEffect } from 'postprocessing'
+import { ToneMappingEffect } from 'postprocessing'
+import { CustomLoadingManager } from './utils/LoadingManager.js'
+import { IceBlockGenerator } from './utils/IceBlockGenerator.js'
+import { EnvironmentSetup } from './utils/EnvironmentSetup.js'
+import { AdvancedTextureLoader } from './utils/TextureLoader.js'
+import { TerrainGenerator } from './utils/TerrainGenerator.js'
+import { ModelLoader } from './utils/ModelLoader.js'
 
-// Dynamic imports for code splitting (igloo.inc optimization technique)
+// Dynamic imports for code splitting
 let OrbitControls
 let gsap
 
 /**
- * Scene Setup
+ * Igloo-Inspired Ice Block Scene
  */
-class WebGLExperience {
+class IglooExperience {
   constructor() {
     this.canvas = document.getElementById('webgl-canvas')
     this.loadingScreen = document.getElementById('loading-screen')
@@ -26,90 +37,93 @@ class WebGLExperience {
     this.clock = new THREE.Clock()
     this.isReady = false
 
-    // Initialize with progressive loading
+    // Initialize
     this.initWithLoading()
   }
 
   async initWithLoading() {
-    // Create custom loading manager (igloo.inc technique)
+    // Loading manager
     this.loadingManager = new CustomLoadingManager(
-      (progress) => {
-        this.updateLoadingProgress(progress)
-      },
-      () => {
-        console.log('All assets loaded')
-      }
+      (progress) => this.updateLoadingProgress(progress),
+      () => console.log('Assets loaded')
     )
 
-    // Phase 1: Load critical dependencies (dynamic imports for code splitting)
+    // Load dependencies
     await this.loadDependencies()
 
-    // Phase 2: Initialize scene
+    // Load textures & HDRI
+    await this.loadAssets()
+
+    // Initialize scene
     this.init()
 
-    // Phase 3: Precompile shaders in background (igloo.inc technique)
-    await this.precompileShaders()
-
-    // Phase 4: Complete loading
+    // Complete loading
+    await this.loadingManager.simulateProgress(500)
     this.completeLoading()
+  }
+
+  async loadAssets() {
+    const loader = new AdvancedTextureLoader()
+
+    // Load ice textures (with fallback to procedural)
+    this.iceTextures = await loader.loadIceTextures()
+
+    // If no textures, create procedural ones
+    if (Object.keys(this.iceTextures).length === 0) {
+      this.iceTextures = {
+        normal: loader.createProceduralNormalMap(),
+        roughness: loader.createProceduralRoughnessMap()
+      }
+    }
+
+    // Load HDRI (with fallback)
+    this.hdriTexture = await loader.loadHDRI()
+
+    // Load 3D igloo model
+    const modelLoader = new ModelLoader(this.loadingManager)
+    try {
+      console.log('📦 Starting to load igloo 3D model...')
+      this.iglooModel = await modelLoader.loadIgloo('/models/igloo.glb')
+      console.log('✅ Igloo 3D model loaded successfully!')
+    } catch (error) {
+      console.error('❌ Failed to load 3D model:', error)
+      console.error('Error details:', error.message)
+      console.warn('⚠️  Will use procedural igloo instead')
+      this.iglooModel = null
+    }
+
+    await this.loadingManager.simulateProgress(500)
   }
 
   async loadDependencies() {
     try {
-      // Dynamic import OrbitControls (lazy load to reduce initial bundle)
+      // Dynamic import OrbitControls
       const controlsModule = await import('three/examples/jsm/controls/OrbitControls')
       OrbitControls = controlsModule.OrbitControls
 
-      // Dynamic import GSAP (lazy load animations library)
+      // Dynamic import GSAP
       const gsapModule = await import('gsap')
       gsap = gsapModule.default
 
-      // Simulate loading progress
       await this.loadingManager.simulateProgress(500)
     } catch (error) {
       console.error('Error loading dependencies:', error)
     }
   }
 
-  async precompileShaders() {
-    // Create shader preloader (prevents stuttering on first render)
-    const shaderPreloader = new ShaderPreloader(
-      this.renderer,
-      this.scene,
-      this.camera
-    )
-
-    // Precompile all materials
-    const materials = [this.shaderMaterial]
-    await shaderPreloader.precompileMaterials(materials, (progress) => {
-      console.log(`Shader compilation: ${progress.toFixed(0)}%`)
-    })
-  }
-
-  completeLoading() {
-    this.isReady = true
-    this.hideLoading()
-  }
-
-  updateLoadingProgress(progress) {
-    this.loadingBar.style.width = `${progress}%`
-    this.loadingPercentage.textContent = `${Math.floor(progress)}%`
-  }
-
   init() {
     // Scene
     this.scene = new THREE.Scene()
-    this.scene.background = new THREE.Color(0x000000)
-    this.scene.fog = new THREE.Fog(0x000000, 5, 15)
 
-    // Camera
+    // Camera (igloo.inc style - lower angle, dramatic composition)
     this.camera = new THREE.PerspectiveCamera(
-      75,
+      50,  // Slightly narrower FOV for more dramatic look
       this.sizes.width / this.sizes.height,
       0.1,
       100
     )
-    this.camera.position.set(0, 0, 5)
+    // Camera positioned to view igloo from front-side angle
+    this.camera.position.set(5, 1.5, 8)
     this.scene.add(this.camera)
 
     // Renderer
@@ -121,125 +135,171 @@ class WebGLExperience {
     this.renderer.setSize(this.sizes.width, this.sizes.height)
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
 
-    // Controls
+    // Environment Setup
+    this.envSetup = new EnvironmentSetup(this.scene, this.renderer)
+    this.envSetup.setupEnvironment()
+    this.envSetup.setupLighting()
+    this.envSetup.setupRenderer()
+
+    // Apply HDRI if loaded
+    if (this.hdriTexture) {
+      console.log('🎨 Applying HDRI to scene...')
+      this.scene.background = this.hdriTexture
+      this.scene.environment = this.hdriTexture
+      console.log('✅ HDRI applied successfully!')
+    } else {
+      console.log('⚠️  No HDRI - using gradient background')
+    }
+
+    // Controls (igloo.inc style)
     this.controls = new OrbitControls(this.camera, this.canvas)
     this.controls.enableDamping = true
-    this.controls.dampingFactor = 0.05
-    this.controls.enableZoom = true
+    this.controls.dampingFactor = 0.08
+    this.controls.minDistance = 4
+    this.controls.maxDistance = 20
+    this.controls.minPolarAngle = Math.PI / 6  // Can look higher
+    this.controls.maxPolarAngle = Math.PI / 2 + 0.3
     this.controls.autoRotate = true
-    this.controls.autoRotateSpeed = 0.5
+    this.controls.autoRotateSpeed = 0.5  // Slightly faster for better view
+    this.controls.target.set(0, 0, 0)  // Look at center
 
-    // Lights
-    this.setupLights()
+    // Create Ice Blocks Scene
+    this.createIceScene()
 
-    // Create 3D Objects
-    this.createObjects()
+    // Post-processing
+    this.setupPostProcessing()
+
+    // Snow particles
+    this.snowParticles = this.envSetup.createSnowParticles(800)
 
     // Event Listeners
-    this.setupEventListeners()
+    window.addEventListener('resize', () => this.onResize())
 
-    // Start Animation
+    // Start animation
     this.animate()
   }
 
-  setupLights() {
-    // Ambient Light
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
-    this.scene.add(ambientLight)
+  createIceScene() {
+    const terrainGen = new TerrainGenerator()
+    const modelLoader = new ModelLoader()
 
-    // Directional Light
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
-    directionalLight.position.set(5, 5, 5)
-    this.scene.add(directionalLight)
+    // Use 3D model if loaded, otherwise use procedural
+    if (this.iglooModel) {
+      console.log('🏠 Using loaded 3D igloo model')
 
-    // Point Lights for dramatic effect
-    const pointLight1 = new THREE.PointLight(0x00ffff, 2, 10)
-    pointLight1.position.set(-3, 2, 3)
-    this.scene.add(pointLight1)
+      // Apply ice material to model
+      modelLoader.applyIceMaterial(this.iglooModel, this.iceTextures)
 
-    const pointLight2 = new THREE.PointLight(0xff00ff, 2, 10)
-    pointLight2.position.set(3, -2, 3)
-    this.scene.add(pointLight2)
-  }
+      // Scale model to appropriate size (3 units tall)
+      modelLoader.scaleModel(this.iglooModel, 3)
 
-  createObjects() {
-    // Custom Shader Material
-    this.shaderMaterial = new THREE.ShaderMaterial({
-      vertexShader: vertexShader,
-      fragmentShader: fragmentShader,
-      uniforms: {
-        uTime: { value: 0 },
-        uWaveAmplitude: { value: 0.3 },
-        uWaveFrequency: { value: 2.0 },
-        uColor1: { value: new THREE.Color(0x00ffff) },
-        uColor2: { value: new THREE.Color(0xff00ff) },
-        uIntensity: { value: 1.0 }
-      },
-      side: THREE.DoubleSide
-    })
+      // Position model
+      this.iglooModel.position.y = -1.5
 
-    // Main Sphere with custom shader
-    const sphereGeometry = new THREE.SphereGeometry(1.5, 128, 128)
-    this.mainSphere = new THREE.Mesh(sphereGeometry, this.shaderMaterial)
-    this.scene.add(this.mainSphere)
-
-    // Additional decorative objects
-    const torusGeometry = new THREE.TorusGeometry(2.5, 0.1, 16, 100)
-    const torusMaterial = new THREE.MeshStandardMaterial({
-      color: 0x00ffff,
-      emissive: 0x00ffff,
-      emissiveIntensity: 0.5,
-      wireframe: true
-    })
-    this.torus = new THREE.Mesh(torusGeometry, torusMaterial)
-    this.scene.add(this.torus)
-
-    // Particles
-    this.createParticles()
-  }
-
-  createParticles() {
-    const particlesGeometry = new THREE.BufferGeometry()
-    const particlesCount = 1000
-
-    const positions = new Float32Array(particlesCount * 3)
-    const colors = new Float32Array(particlesCount * 3)
-
-    for (let i = 0; i < particlesCount * 3; i += 3) {
-      // Position
-      positions[i] = (Math.random() - 0.5) * 20
-      positions[i + 1] = (Math.random() - 0.5) * 20
-      positions[i + 2] = (Math.random() - 0.5) * 20
-
-      // Color
-      const color = new THREE.Color()
-      color.setHSL(Math.random(), 1.0, 0.5)
-      colors[i] = color.r
-      colors[i + 1] = color.g
-      colors[i + 2] = color.b
+      this.scene.add(this.iglooModel)
+      this.iceStructure = this.iglooModel
+    } else {
+      console.log('🧊 Using procedural igloo structure')
+      const generator = new IceBlockGenerator()
+      const { group: iceStructure, blocks: iceBlocks } = generator.createIceStructure(60, this.iceTextures)
+      this.scene.add(iceStructure)
+      this.iceBlocks = iceBlocks
+      this.iceStructure = iceStructure
     }
 
-    particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
-    particlesGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+    // Add inner glow light inside igloo (warm orange/yellow glow)
+    const innerLight = new THREE.PointLight(0xffa040, 8, 10)
+    innerLight.position.set(0, -0.5, 0)  // Inside igloo center
+    innerLight.castShadow = false
+    this.scene.add(innerLight)
 
-    const particlesMaterial = new THREE.PointsMaterial({
-      size: 0.05,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.8,
-      blending: THREE.AdditiveBlending
-    })
+    // Additional soft inner lights for better coverage
+    const innerLight2 = new THREE.PointLight(0xffb060, 5, 8)
+    innerLight2.position.set(1, -0.8, 0)
+    this.scene.add(innerLight2)
 
-    this.particles = new THREE.Points(particlesGeometry, particlesMaterial)
-    this.scene.add(this.particles)
+    const innerLight3 = new THREE.PointLight(0xffb060, 5, 8)
+    innerLight3.position.set(-1, -0.8, 0)
+    this.scene.add(innerLight3)
+
+    // Create detailed terrain
+    const terrain = terrainGen.createTerrain(60)
+    this.scene.add(terrain)
+
+    // Create mountains background
+    const mountains = terrainGen.createMountains()
+    this.scene.add(mountains)
+
+    // Create fog layers
+    const fogLayers = terrainGen.createFogLayers()
+    this.scene.add(fogLayers)
   }
 
+  setupPostProcessing() {
+    try {
+      this.composer = new EffectComposer(this.renderer)
+
+      // Render pass
+      const renderPass = new RenderPass(this.scene, this.camera)
+      this.composer.addPass(renderPass)
+
+      // Bloom effect (for ice edge glow - igloo.inc style)
+      const bloomEffect = new BloomEffect({
+        intensity: 1.2,
+        luminanceThreshold: 0.2,
+        luminanceSmoothing: 0.9,
+        mipmapBlur: true
+      })
+
+      // Vignette effect (very subtle - igloo.inc style)
+      const vignetteEffect = new VignetteEffect({
+        offset: 0.5,
+        darkness: 0.4
+      })
+
+      // Film grain (cinematic look)
+      const noiseEffect = new NoiseEffect({
+        premultiply: true
+      })
+      noiseEffect.blendMode.opacity.value = 0.2
+
+      // Chromatic aberration (subtle color fringing)
+      const chromaticEffect = new ChromaticAberrationEffect({
+        offset: new THREE.Vector2(0.002, 0.002)
+      })
+
+      // Effect pass with working effects
+      const effectPass = new EffectPass(
+        this.camera,
+        bloomEffect,
+        vignetteEffect,
+        noiseEffect,
+        chromaticEffect
+      )
+      this.composer.addPass(effectPass)
+
+      console.log('✅ Post-processing setup complete')
+    } catch (error) {
+      console.error('❌ Post-processing error:', error)
+      this.composer = null
+    }
+  }
+
+  updateLoadingProgress(progress) {
+    this.loadingBar.style.width = `${progress}%`
+    this.loadingPercentage.textContent = `${Math.floor(progress)}%`
+  }
+
+  completeLoading() {
+    this.isReady = true
+    this.hideLoading()
+  }
 
   hideLoading() {
     gsap.to(this.loadingScreen, {
       opacity: 0,
       duration: 1,
-      delay: 0.5,
+      delay: 0.3,
       onComplete: () => {
         this.loadingScreen.style.display = 'none'
         this.showUI()
@@ -251,13 +311,9 @@ class WebGLExperience {
     this.uiOverlay.classList.add('visible')
     gsap.fromTo(
       this.uiOverlay,
-      { y: 50, opacity: 0 },
+      { y: 30, opacity: 0 },
       { y: 0, opacity: 1, duration: 1.5, ease: 'power3.out' }
     )
-  }
-
-  setupEventListeners() {
-    window.addEventListener('resize', () => this.onResize())
   }
 
   onResize() {
@@ -269,6 +325,10 @@ class WebGLExperience {
 
     this.renderer.setSize(this.sizes.width, this.sizes.height)
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+
+    if (this.composer) {
+      this.composer.setSize(this.sizes.width, this.sizes.height)
+    }
   }
 
   animate() {
@@ -276,35 +336,29 @@ class WebGLExperience {
 
     const elapsedTime = this.clock.getElapsedTime()
 
-    // Update shader uniforms
-    if (this.shaderMaterial) {
-      this.shaderMaterial.uniforms.uTime.value = elapsedTime
+    // Animate igloo (very subtle floating - no rotation to keep structure intact)
+    if (this.iceStructure) {
+      this.iceStructure.position.y = Math.sin(elapsedTime * 0.2) * 0.05
     }
 
-    // Rotate objects
-    if (this.mainSphere) {
-      this.mainSphere.rotation.y = elapsedTime * 0.2
-      this.mainSphere.rotation.x = Math.sin(elapsedTime * 0.3) * 0.2
+    // Animate snow
+    if (this.snowParticles && this.envSetup) {
+      this.envSetup.animateSnow(this.snowParticles)
     }
 
-    if (this.torus) {
-      this.torus.rotation.x = elapsedTime * 0.1
-      this.torus.rotation.y = elapsedTime * 0.15
-    }
-
-    if (this.particles) {
-      this.particles.rotation.y = elapsedTime * 0.05
-    }
-
-    // Update controls (only if loaded via dynamic import)
+    // Update controls
     if (this.controls) {
       this.controls.update()
     }
 
-    // Render
-    this.renderer.render(this.scene, this.camera)
+    // Render with post-processing
+    if (this.composer) {
+      this.composer.render()
+    } else {
+      this.renderer.render(this.scene, this.camera)
+    }
   }
 }
 
-// Initialize the experience
-new WebGLExperience()
+// Initialize
+new IglooExperience()
