@@ -43,6 +43,11 @@ class IglooExperience {
     this.originalCameraPosition = { x: 6, y: 2.5, z: 12 }  // Original 3/4 view angle (further away)
     this.targetCameraPosition = { x: 6, y: 2.5, z: 12 }  // 3/4 view angle (igloo.inc style)
 
+    // Camera lock system
+    this.cameraLocked = true
+    this.lockedCameraPosition = { x: 6, y: 2.5, z: 12 }  // Default locked position
+    this.lockedCameraTarget = { x: 0, y: 0, z: 0 }  // Default look at center
+
     // Debug mode
     this.debugMode = false
     this.freeRotationMode = false
@@ -183,8 +188,20 @@ class IglooExperience {
       0.1,
       100
     )
-    // Camera positioned to view igloo from front-left 3/4 angle (igloo.inc composition)
-    this.camera.position.set(6, 2.5, 12)
+
+    // Load saved camera position from localStorage or use default
+    const savedCamera = this.loadLockedCameraPosition()
+    if (savedCamera) {
+      this.camera.position.set(savedCamera.position.x, savedCamera.position.y, savedCamera.position.z)
+      this.lockedCameraPosition = savedCamera.position
+      this.lockedCameraTarget = savedCamera.target
+      console.log('✅ Loaded saved camera position:', savedCamera.position)
+    } else {
+      // Default camera position (igloo.inc composition - front-left 3/4 angle)
+      this.camera.position.set(6, 2.5, 12)
+      console.log('Using default camera position')
+    }
+
     this.scene.add(this.camera)
 
     // Renderer
@@ -228,8 +245,15 @@ class IglooExperience {
     this.controls.minPolarAngle = Math.PI / 6
     this.controls.maxPolarAngle = Math.PI / 2 + 0.3
     this.controls.autoRotate = false  // Disabled for scroll-based experience
-    this.controls.enabled = false  // Will be controlled by scroll
-    this.controls.target.set(0, 0, 0)
+    this.controls.enabled = false  // Will be controlled by scroll/lock state
+
+    // Set target from saved camera data or default
+    this.controls.target.set(
+      this.lockedCameraTarget.x,
+      this.lockedCameraTarget.y,
+      this.lockedCameraTarget.z
+    )
+    this.controls.update()
 
     // Create Ice Blocks Scene
     this.createIceScene()
@@ -799,6 +823,86 @@ class IglooExperience {
     console.log('🔄 Mountain transform reset to default')
   }
 
+  saveLockedCameraPosition() {
+    if (!this.camera) return
+
+    // Get current camera target from OrbitControls
+    const target = this.controls ? this.controls.target : new THREE.Vector3(0, 0, 0)
+
+    const cameraData = {
+      position: {
+        x: this.camera.position.x,
+        y: this.camera.position.y,
+        z: this.camera.position.z
+      },
+      target: {
+        x: target.x,
+        y: target.y,
+        z: target.z
+      }
+    }
+
+    localStorage.setItem('lockedCameraPosition', JSON.stringify(cameraData))
+    console.log('💾 Locked camera position saved to localStorage:', cameraData)
+  }
+
+  loadLockedCameraPosition() {
+    const saved = localStorage.getItem('lockedCameraPosition')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        console.error('Failed to parse saved camera position:', e)
+        return null
+      }
+    }
+    return null
+  }
+
+  toggleCameraLock(locked) {
+    this.cameraLocked = locked
+
+    if (!locked) {
+      // Unlock - enable free camera movement for adjustment
+      console.log('🔓 Camera unlocked - adjust view freely')
+
+      // Enable OrbitControls for camera adjustment
+      if (this.controls) {
+        this.controls.enabled = true
+      }
+    } else {
+      // Lock - save current position as new home position
+      console.log('🔒 Camera locked at current position')
+
+      // Save current camera position as the new locked position
+      this.lockedCameraPosition = {
+        x: this.camera.position.x,
+        y: this.camera.position.y,
+        z: this.camera.position.z
+      }
+
+      // Save current camera target
+      if (this.controls) {
+        this.lockedCameraTarget = {
+          x: this.controls.target.x,
+          y: this.controls.target.y,
+          z: this.controls.target.z
+        }
+      }
+
+      // Save to localStorage (permanent save)
+      this.saveLockedCameraPosition()
+
+      // Disable OrbitControls (camera now fixed at this position)
+      if (this.controls) {
+        this.controls.enabled = false
+      }
+
+      console.log('📍 Locked position:', this.lockedCameraPosition)
+      console.log('🎯 Locked target:', this.lockedCameraTarget)
+    }
+  }
+
   setupLightingControls() {
     // Get slider elements
     const globalSlider = document.getElementById('global-light-slider')
@@ -929,6 +1033,7 @@ class IglooExperience {
     this.debugMinimizeBtn = document.getElementById('debug-minimize')
     this.debugCloseBtn = document.getElementById('debug-close')
     this.rotationToggle = document.getElementById('rotation-toggle')
+    this.cameraLockToggle = document.getElementById('camera-lock-toggle')
 
     // Debug info elements
     this.cameraPosEl = document.getElementById('camera-pos')
@@ -952,6 +1057,11 @@ class IglooExperience {
     // Rotation toggle
     this.rotationToggle.addEventListener('change', (e) => {
       this.toggleRotationMode(e.target.checked)
+    })
+
+    // Camera lock toggle
+    this.cameraLockToggle.addEventListener('change', (e) => {
+      this.toggleCameraLock(e.target.checked)
     })
 
     // Lighting sliders
@@ -1036,28 +1146,30 @@ class IglooExperience {
       this.controls.enabled = true
       console.log('🔄 Free rotation mode enabled - drag to rotate 360°')
     } else {
-      // Disable OrbitControls, use parallax
-      this.controls.enabled = false
+      // Disable OrbitControls if camera is locked
+      if (this.cameraLocked) {
+        this.controls.enabled = false
+      }
 
-      // Reset camera to original position with smooth animation
+      // Return camera to LOCKED position (not original hardcoded position)
       gsap.to(this.camera.position, {
-        x: this.originalCameraPosition.x,
-        y: this.originalCameraPosition.y,
-        z: this.originalCameraPosition.z,
+        x: this.lockedCameraPosition.x,
+        y: this.lockedCameraPosition.y,
+        z: this.lockedCameraPosition.z,
         duration: 1.2,
         ease: 'power2.inOut',
         onUpdate: () => {
-          // Keep camera looking at center during transition
-          this.camera.lookAt(0, 0, 0)
+          // Keep camera looking at locked target during transition
+          this.camera.lookAt(this.lockedCameraTarget.x, this.lockedCameraTarget.y, this.lockedCameraTarget.z)
         },
         onComplete: () => {
-          // Reset target position for parallax
-          this.targetCameraPosition.x = this.originalCameraPosition.x
-          this.targetCameraPosition.y = this.originalCameraPosition.y
-          this.targetCameraPosition.z = this.originalCameraPosition.z
+          // Reset target position for parallax to locked position
+          this.targetCameraPosition.x = this.lockedCameraPosition.x
+          this.targetCameraPosition.y = this.lockedCameraPosition.y
+          this.targetCameraPosition.z = this.lockedCameraPosition.z
 
-          // Reset controls target
-          this.controls.target.set(0, 0, 0)
+          // Reset controls target to locked target
+          this.controls.target.set(this.lockedCameraTarget.x, this.lockedCameraTarget.y, this.lockedCameraTarget.z)
           this.controls.update()
 
           console.log('🔒 Parallax mode enabled - camera reset to original view')
@@ -1200,23 +1312,23 @@ class IglooExperience {
     const elapsedTime = this.clock.getElapsedTime()
 
     // Camera controls based on mode
-    if (this.freeRotationMode) {
-      // Free rotation mode - OrbitControls handles camera
+    if (this.freeRotationMode || !this.cameraLocked) {
+      // Free rotation mode OR unlocked camera = OrbitControls active
       this.controls.update()
     } else {
-      // Parallax mode - mouse controls camera position
-      // Calculate target position based on mouse (offset from original position)
-      this.targetCameraPosition.x = this.originalCameraPosition.x + this.mouse.x * 0.5  // ±0.5 units horizontal movement
-      this.targetCameraPosition.y = this.originalCameraPosition.y + this.mouse.y * 0.3  // ±0.3 unit vertical movement
-      this.targetCameraPosition.z = this.originalCameraPosition.z  // Keep Z fixed
+      // Locked = parallax effect (subtle mouse-based camera movement)
+      // Calculate target position based on mouse (offset from LOCKED position)
+      this.targetCameraPosition.x = this.lockedCameraPosition.x + this.mouse.x * 0.5  // ±0.5 units horizontal
+      this.targetCameraPosition.y = this.lockedCameraPosition.y + this.mouse.y * 0.3  // ±0.3 units vertical
+      this.targetCameraPosition.z = this.lockedCameraPosition.z  // Keep Z fixed
 
       // Smooth lerp camera to target position
       this.camera.position.x += (this.targetCameraPosition.x - this.camera.position.x) * 0.05
       this.camera.position.y += (this.targetCameraPosition.y - this.camera.position.y) * 0.05
       this.camera.position.z += (this.targetCameraPosition.z - this.camera.position.z) * 0.05
 
-      // Always look at center
-      this.camera.lookAt(0, 0, 0)
+      // Look at locked target
+      this.camera.lookAt(this.lockedCameraTarget.x, this.lockedCameraTarget.y, this.lockedCameraTarget.z)
     }
 
     // Animate igloo (very subtle floating - no rotation to keep structure intact)
