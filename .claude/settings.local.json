@@ -7,7 +7,8 @@
       "Read(//d/Projects/contentanalysis/.vscode/**)",
       "Read(//d/Projects/nasi-project/**)",
       "Bash(rm:*)",
-      "Read(//c/Users/Admin/Pictures/Screenshots/**)"
+      "Read(//c/Users/Admin/Pictures/Screenshots/**)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []
