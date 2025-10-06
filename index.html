@@ -25,6 +25,74 @@
     <p class="subtitle">Arctic Ice Experience</p>
   </div>
 
+  <!-- Debug Panel -->
+  <div id="debug-panel" class="debug-panel minimized">
+    <div class="debug-header">
+      <span class="debug-title">🔧 Debug Panel</span>
+      <div class="debug-controls">
+        <button id="debug-minimize" class="debug-btn" title="Minimize/Maximize">−</button>
+        <button id="debug-close" class="debug-btn" title="Close (Press D to reopen)">×</button>
+      </div>
+    </div>
+    <div class="debug-content">
+      <!-- Rotation Mode Toggle -->
+      <div class="debug-section">
+        <h3>🔄 Camera Controls</h3>
+        <div class="debug-row">
+          <label class="toggle-label">
+            <span>Free Rotation (360°)</span>
+            <input type="checkbox" id="rotation-toggle" class="toggle-checkbox">
+            <span class="toggle-switch"></span>
+          </label>
+        </div>
+        <p class="debug-hint">Toggle to freely rotate camera and find ice ground</p>
+      </div>
+
+      <!-- Debug Info -->
+      <div class="debug-section">
+        <h3>📍 Position Info</h3>
+        <div class="debug-info">
+          <div class="info-row">
+            <span>Camera:</span>
+            <span id="camera-pos">0, 0, 0</span>
+          </div>
+          <div class="info-row">
+            <span>Igloo:</span>
+            <span id="igloo-pos">0, 0, 0</span>
+          </div>
+          <div class="info-row">
+            <span>Ice Ground:</span>
+            <span id="ground-pos">Not loaded</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Performance -->
+      <div class="debug-section">
+        <h3>⚡ Performance</h3>
+        <div class="debug-info">
+          <div class="info-row">
+            <span>FPS:</span>
+            <span id="fps-counter">60</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Keyboard Shortcuts -->
+      <div class="debug-section">
+        <h3>⌨️ Shortcuts</h3>
+        <div class="debug-info shortcuts">
+          <div class="shortcut-row">
+            <kbd>D</kbd> <span>Toggle Panel</span>
+          </div>
+          <div class="shortcut-row">
+            <kbd>R</kbd> <span>Toggle Rotation</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script type="module" src="/src/main.js"></script>
 </body>

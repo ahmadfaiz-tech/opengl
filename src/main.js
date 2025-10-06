@@ -41,6 +41,13 @@ class IglooExperience {
     this.mouse = { x: 0, y: 0 }
     this.targetCameraPosition = { x: 4, y: 1.5, z: 7 }  // 3/4 view angle (igloo.inc style)
 
+    // Debug mode
+    this.debugMode = false
+    this.freeRotationMode = false
+    this.lastFrameTime = performance.now()
+    this.frameCount = 0
+    this.fps = 60
+
     // Initialize
     this.initWithLoading()
   }
@@ -190,6 +197,9 @@ class IglooExperience {
     // Event Listeners
     window.addEventListener('resize', () => this.onResize())
     window.addEventListener('mousemove', (e) => this.onMouseMove(e))
+
+    // Initialize debug panel
+    this.initDebugPanel()
 
     // Start animation
     this.animate()
@@ -363,22 +373,154 @@ class IglooExperience {
     }
   }
 
+  initDebugPanel() {
+    this.debugPanel = document.getElementById('debug-panel')
+    this.debugMinimizeBtn = document.getElementById('debug-minimize')
+    this.debugCloseBtn = document.getElementById('debug-close')
+    this.rotationToggle = document.getElementById('rotation-toggle')
+
+    // Debug info elements
+    this.cameraPosEl = document.getElementById('camera-pos')
+    this.iglooPosEl = document.getElementById('igloo-pos')
+    this.groundPosEl = document.getElementById('ground-pos')
+    this.fpsCounterEl = document.getElementById('fps-counter')
+
+    // Minimize/Maximize
+    this.debugMinimizeBtn.addEventListener('click', () => {
+      this.debugPanel.classList.toggle('minimized')
+      this.debugMinimizeBtn.textContent = this.debugPanel.classList.contains('minimized') ? '+' : '−'
+    })
+
+    // Close panel
+    this.debugCloseBtn.addEventListener('click', () => {
+      this.debugPanel.classList.add('hidden')
+    })
+
+    // Rotation toggle
+    this.rotationToggle.addEventListener('change', (e) => {
+      this.toggleRotationMode(e.target.checked)
+    })
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e) => {
+      // D key - toggle debug panel
+      if (e.key === 'd' || e.key === 'D') {
+        this.debugPanel.classList.toggle('hidden')
+      }
+
+      // R key - toggle rotation mode
+      if (e.key === 'r' || e.key === 'R') {
+        this.rotationToggle.checked = !this.rotationToggle.checked
+        this.toggleRotationMode(this.rotationToggle.checked)
+      }
+    })
+
+    // Make panel draggable
+    this.makeDraggable(this.debugPanel)
+  }
+
+  makeDraggable(element) {
+    const header = element.querySelector('.debug-header')
+    let isDragging = false
+    let currentX
+    let currentY
+    let initialX
+    let initialY
+
+    header.addEventListener('mousedown', (e) => {
+      if (e.target.classList.contains('debug-btn')) return
+
+      isDragging = true
+      initialX = e.clientX - element.offsetLeft
+      initialY = e.clientY - element.offsetTop
+    })
+
+    document.addEventListener('mousemove', (e) => {
+      if (isDragging) {
+        e.preventDefault()
+        currentX = e.clientX - initialX
+        currentY = e.clientY - initialY
+
+        element.style.left = currentX + 'px'
+        element.style.top = currentY + 'px'
+        element.style.right = 'auto'
+      }
+    })
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false
+    })
+  }
+
+  toggleRotationMode(enabled) {
+    this.freeRotationMode = enabled
+
+    if (enabled) {
+      // Enable OrbitControls for free rotation
+      this.controls.enabled = true
+      console.log('🔄 Free rotation mode enabled - drag to rotate 360°')
+    } else {
+      // Disable OrbitControls, use parallax
+      this.controls.enabled = false
+      console.log('🔒 Parallax mode enabled - hover to view')
+    }
+  }
+
+  updateDebugInfo() {
+    if (this.debugPanel.classList.contains('hidden')) return
+
+    // Update camera position
+    this.cameraPosEl.textContent = `${this.camera.position.x.toFixed(2)}, ${this.camera.position.y.toFixed(2)}, ${this.camera.position.z.toFixed(2)}`
+
+    // Update igloo position
+    if (this.iceStructure) {
+      const baseY = -1.5
+      const currentY = this.iceStructure.position.y
+      this.iglooPosEl.textContent = `${this.iceStructure.position.x.toFixed(2)}, ${currentY.toFixed(2)} (base: ${baseY}), ${this.iceStructure.position.z.toFixed(2)}`
+    }
+
+    // Update ground position
+    if (this.iceGroundModel) {
+      this.groundPosEl.textContent = `${this.iceGroundModel.position.x.toFixed(2)}, ${this.iceGroundModel.position.y.toFixed(2)}, ${this.iceGroundModel.position.z.toFixed(2)}`
+    } else {
+      this.groundPosEl.textContent = 'Not loaded'
+    }
+
+    // Update FPS
+    this.frameCount++
+    const now = performance.now()
+    const elapsed = now - this.lastFrameTime
+
+    if (elapsed >= 1000) {
+      this.fps = Math.round((this.frameCount * 1000) / elapsed)
+      this.fpsCounterEl.textContent = this.fps
+      this.frameCount = 0
+      this.lastFrameTime = now
+    }
+  }
+
   animate() {
     requestAnimationFrame(() => this.animate())
 
     const elapsedTime = this.clock.getElapsedTime()
 
-    // Mouse parallax effect on camera (igloo.inc style)
-    // Calculate target position based on mouse
-    this.targetCameraPosition.x = this.mouse.x * 0.5  // ±0.5 units horizontal movement
-    this.targetCameraPosition.y = 1.5 + this.mouse.y * 0.3  // ±0.3 unit vertical movement
+    // Camera controls based on mode
+    if (this.freeRotationMode) {
+      // Free rotation mode - OrbitControls handles camera
+      this.controls.update()
+    } else {
+      // Parallax mode - mouse controls camera position
+      // Calculate target position based on mouse
+      this.targetCameraPosition.x = this.mouse.x * 0.5  // ±0.5 units horizontal movement
+      this.targetCameraPosition.y = 1.5 + this.mouse.y * 0.3  // ±0.3 unit vertical movement
 
-    // Smooth lerp camera to target position
-    this.camera.position.x += (this.targetCameraPosition.x - this.camera.position.x) * 0.05
-    this.camera.position.y += (this.targetCameraPosition.y - this.camera.position.y) * 0.05
+      // Smooth lerp camera to target position
+      this.camera.position.x += (this.targetCameraPosition.x - this.camera.position.x) * 0.05
+      this.camera.position.y += (this.targetCameraPosition.y - this.camera.position.y) * 0.05
 
-    // Always look at center
-    this.camera.lookAt(0, 0, 0)
+      // Always look at center
+      this.camera.lookAt(0, 0, 0)
+    }
 
     // Animate igloo (very subtle floating - no rotation to keep structure intact)
     if (this.iceStructure) {
@@ -389,6 +531,9 @@ class IglooExperience {
     if (this.snowParticles && this.envSetup) {
       this.envSetup.animateSnow(this.snowParticles)
     }
+
+    // Update debug info
+    this.updateDebugInfo()
 
     // Render with post-processing
     if (this.composer) {
