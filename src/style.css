@@ -342,6 +342,120 @@ body {
   color: rgba(255, 255, 255, 0.7);
 }
 
+/* Slider Controls */
+.slider-control {
+  margin-bottom: 12px;
+}
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.slider-label span:first-child {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.slider-value {
+  color: #00ffff;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
+}
+
+/* Custom Range Slider */
+.light-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.light-slider::-webkit-slider-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.light-slider::-moz-range-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.light-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #00ffff;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+  transition: all 0.2s;
+}
+
+.light-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: #00ffff;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+  transition: all 0.2s;
+}
+
+.light-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.2);
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.8);
+}
+
+.light-slider:hover::-moz-range-thumb {
+  transform: scale(1.2);
+  box-shadow: 0 0 12px rgba(0, 255, 255, 0.8);
+}
+
+.light-slider:active::-webkit-slider-thumb {
+  transform: scale(1.1);
+}
+
+.light-slider:active::-moz-range-thumb {
+  transform: scale(1.1);
+}
+
+/* Action Buttons */
+.debug-action-btn {
+  flex: 1;
+  padding: 8px 12px;
+  background: rgba(0, 255, 255, 0.1);
+  border: 1px solid rgba(0, 255, 255, 0.3);
+  color: #00ffff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.debug-action-btn:hover {
+  background: rgba(0, 255, 255, 0.2);
+  border-color: rgba(0, 255, 255, 0.5);
+}
+
+.debug-action-btn:active {
+  transform: scale(0.95);
+}
+
 /* Scrollbar */
 .debug-content::-webkit-scrollbar {
   width: 6px;

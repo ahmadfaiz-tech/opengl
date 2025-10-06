@@ -61,6 +61,57 @@
         <p class="debug-hint">Toggle to freely rotate camera and find ice ground</p>
       </div>
 
+      <!-- Lighting Controls -->
+      <div class="debug-section">
+        <h3>💡 Lighting Intensity</h3>
+
+        <!-- Global Intensity -->
+        <div class="slider-control">
+          <div class="slider-label">
+            <span>Global</span>
+            <span id="global-light-value" class="slider-value">100%</span>
+          </div>
+          <input type="range" id="global-light-slider" class="light-slider" min="0" max="200" value="100" step="5">
+        </div>
+
+        <!-- Ambient Light -->
+        <div class="slider-control">
+          <div class="slider-label">
+            <span>Ambient</span>
+            <span id="ambient-light-value" class="slider-value">100%</span>
+          </div>
+          <input type="range" id="ambient-light-slider" class="light-slider" min="0" max="200" value="100" step="5">
+        </div>
+
+        <!-- Point Lights (Inner Glow) -->
+        <div class="slider-control">
+          <div class="slider-label">
+            <span>Inner Glow</span>
+            <span id="inner-light-value" class="slider-value">100%</span>
+          </div>
+          <input type="range" id="inner-light-slider" class="light-slider" min="0" max="200" value="100" step="5">
+        </div>
+
+        <button id="reset-lighting-btn" class="debug-action-btn" style="margin-top: 8px; width: 100%;">🔄 Reset Lighting</button>
+        <p class="debug-hint">Adjust lighting intensity (0-200%)</p>
+      </div>
+
+      <!-- Ice Ground Selection -->
+      <div class="debug-section">
+        <h3>🎯 Ice Ground Selection</h3>
+        <div class="debug-info">
+          <div class="info-row">
+            <span>Selected:</span>
+            <span id="selection-state">No</span>
+          </div>
+        </div>
+        <div class="debug-row" style="margin-top: 12px; display: flex; gap: 8px;">
+          <button id="save-position-btn" class="debug-action-btn">💾 Save Position</button>
+          <button id="reset-position-btn" class="debug-action-btn">🔄 Reset</button>
+        </div>
+        <p class="debug-hint">Click ice ground to select. Use arrow keys to move (Shift = faster)</p>
+      </div>
+
       <!-- Debug Info -->
       <div class="debug-section">
         <h3>📍 Position Info</h3>
@@ -76,6 +127,10 @@
           <div class="info-row">
             <span>Ice Ground:</span>
             <span id="ground-pos">Not loaded</span>
+          </div>
+          <div class="info-row">
+            <span>Mountain:</span>
+            <span id="mountain-pos">Not loaded</span>
           </div>
         </div>
       </div>
@@ -100,6 +155,30 @@
           </div>
           <div class="shortcut-row">
             <kbd>R</kbd> <span>Toggle Rotation</span>
+          </div>
+          <div class="shortcut-row">
+            <kbd>↑</kbd> <span>Move Up</span>
+          </div>
+          <div class="shortcut-row">
+            <kbd>↓</kbd> <span>Move Down</span>
+          </div>
+          <div class="shortcut-row">
+            <kbd>←</kbd> <span>Move Left</span>
+          </div>
+          <div class="shortcut-row">
+            <kbd>→</kbd> <span>Move Right</span>
+          </div>
+          <div class="shortcut-row">
+            <kbd>8</kbd> <span>Rotate Pitch Up</span>
+          </div>
+          <div class="shortcut-row">
+            <kbd>2</kbd> <span>Rotate Pitch Down</span>
+          </div>
+          <div class="shortcut-row">
+            <kbd>4</kbd> <span>Rotate Yaw Left</span>
+          </div>
+          <div class="shortcut-row">
+            <kbd>6</kbd> <span>Rotate Yaw Right</span>
           </div>
         </div>
       </div>

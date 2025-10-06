@@ -130,13 +130,69 @@ export class ModelLoader {
 
   /**
    * Apply ice material to all meshes in a model
+   * Preserves original textures while enhancing material properties
    */
   applyIceMaterial(model, textures = {}) {
-    const iceMaterial = this.createIceMaterial(textures);
-
     model.traverse((child) => {
-      if (child.isMesh) {
-        child.material = iceMaterial;
+      if (child.isMesh && child.material) {
+        const originalMaterial = child.material;
+
+        // Preserve all original textures
+        const preservedTextures = {
+          map: originalMaterial.map,
+          normalMap: originalMaterial.normalMap,
+          roughnessMap: originalMaterial.roughnessMap,
+          metalnessMap: originalMaterial.metalnessMap,
+          aoMap: originalMaterial.aoMap,
+          emissiveMap: originalMaterial.emissiveMap,
+          alphaMap: originalMaterial.alphaMap,
+          lightMap: originalMaterial.lightMap
+        };
+
+        // Preserve original color from GLB material
+        const baseColor = originalMaterial.color || 0xffffff;
+
+        // Create enhanced material config that preserves textures
+        const enhancedConfig = {
+          // Preserve original textures
+          map: preservedTextures.map,
+          normalMap: preservedTextures.normalMap,
+          roughnessMap: preservedTextures.roughnessMap,
+          metalnessMap: preservedTextures.metalnessMap,
+          aoMap: preservedTextures.aoMap,
+          emissiveMap: preservedTextures.emissiveMap,
+          alphaMap: preservedTextures.alphaMap,
+          lightMap: preservedTextures.lightMap,
+
+          // Base color (white if texture exists, otherwise use original/default)
+          color: baseColor,
+
+          // Ice-like properties (subtle enhancements)
+          transmission: 0.1,  // Reduced for more opacity
+          thickness: 0.3,
+          roughness: preservedTextures.roughnessMap ? originalMaterial.roughness : 0.4,
+          metalness: preservedTextures.metalnessMap ? originalMaterial.metalness : 0.05,
+          ior: 1.31,
+          reflectivity: 0.4,
+          clearcoat: 0.6,
+          clearcoatRoughness: 0.2,
+          emissive: preservedTextures.emissiveMap ? (originalMaterial.emissive || 0x000000) : 0x4080a0,
+          emissiveIntensity: 0.1,
+          transparent: originalMaterial.transparent || false,
+          opacity: originalMaterial.opacity !== undefined ? originalMaterial.opacity : 1.0,
+          side: THREE.DoubleSide,
+          envMapIntensity: 2.0
+        };
+
+        // Apply normal scale if normal map exists
+        if (preservedTextures.normalMap) {
+          enhancedConfig.normalScale = originalMaterial.normalScale || new THREE.Vector2(1, 1);
+        }
+
+        // Create new material with preserved textures
+        child.material = new THREE.MeshPhysicalMaterial(enhancedConfig);
+
+        // Enable shadows
         child.castShadow = true;
         child.receiveShadow = true;
       }

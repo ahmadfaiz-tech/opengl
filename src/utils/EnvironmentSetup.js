@@ -79,12 +79,14 @@ export class EnvironmentSetup {
     const lights = [];
 
     // 1. Ambient Light - soft overall illumination (reduced)
-    const ambient = new THREE.AmbientLight(0xd8e8f0, 0.3);
+    const ambient = new THREE.AmbientLight(0xd8e8f0, 0.2);
+    ambient.userData.baseIntensity = 0.2;
     this.scene.add(ambient);
     lights.push(ambient);
 
-    // 2. Main Directional Light (sun/moon) - more dramatic
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.8);
+    // 2. Main Directional Light (sun/moon) - reduced intensity
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.userData.baseIntensity = 0.8;
     dirLight.position.set(5, 10, 5);
     dirLight.castShadow = true;
 
@@ -102,42 +104,49 @@ export class EnvironmentSetup {
     this.scene.add(dirLight);
     lights.push(dirLight);
 
-    // 3. Fill Light (bounce light from ice/snow)
-    const fillLight = new THREE.DirectionalLight(0xa8d5e8, 0.4);
+    // 3. Fill Light (bounce light from ice/snow) - reduced
+    const fillLight = new THREE.DirectionalLight(0xa8d5e8, 0.2);
+    fillLight.userData.baseIntensity = 0.2;
     fillLight.position.set(-5, 3, -5);
     this.scene.add(fillLight);
     lights.push(fillLight);
 
-    // 4. Strong Rim Lights (like igloo.inc - white edge glow) - MORE INTENSE
-    const rimLight1 = new THREE.DirectionalLight(0xffffff, 4.0);
+    // 4. Rim Lights - SIGNIFICANTLY reduced
+    const rimLight1 = new THREE.DirectionalLight(0xffffff, 1.0);
+    rimLight1.userData.baseIntensity = 1.0;
     rimLight1.position.set(8, 8, -8);
     this.scene.add(rimLight1);
     lights.push(rimLight1);
 
-    const rimLight2 = new THREE.DirectionalLight(0xe0f0ff, 3.0);
+    const rimLight2 = new THREE.DirectionalLight(0xe0f0ff, 0.8);
+    rimLight2.userData.baseIntensity = 0.8;
     rimLight2.position.set(-6, 6, -10);
     this.scene.add(rimLight2);
     lights.push(rimLight2);
 
-    // 5. Accent Point Lights (strong cyan/blue glow) - reduced
-    const pointLight1 = new THREE.PointLight(0x60e8ff, 2.5, 20);
+    // 5. Accent Point Lights - SIGNIFICANTLY reduced
+    const pointLight1 = new THREE.PointLight(0x60e8ff, 0.8, 20);
+    pointLight1.userData.baseIntensity = 0.8;
     pointLight1.position.set(-8, 4, 8);
     this.scene.add(pointLight1);
     lights.push(pointLight1);
 
-    const pointLight2 = new THREE.PointLight(0x40d0ff, 2.0, 18);
+    const pointLight2 = new THREE.PointLight(0x40d0ff, 0.6, 18);
+    pointLight2.userData.baseIntensity = 0.6;
     pointLight2.position.set(8, 5, -5);
     this.scene.add(pointLight2);
     lights.push(pointLight2);
 
-    // 6. Back Light (strong silhouette - igloo.inc style) - STRONGER
-    const backLight = new THREE.DirectionalLight(0xffffff, 5.0);
+    // 6. Back Light - SIGNIFICANTLY reduced
+    const backLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    backLight.userData.baseIntensity = 1.2;
     backLight.position.set(0, 10, -15);
     this.scene.add(backLight);
     lights.push(backLight);
 
-    // 7. Hemisphere Light (sky and ground)
-    const hemiLight = new THREE.HemisphereLight(0xd8f0f8, 0xa0b8c8, 0.8);
+    // 7. Hemisphere Light - reduced
+    const hemiLight = new THREE.HemisphereLight(0xd8f0f8, 0xa0b8c8, 0.4);
+    hemiLight.userData.baseIntensity = 0.4;
     this.scene.add(hemiLight);
     lights.push(hemiLight);
 
@@ -154,7 +163,7 @@ export class EnvironmentSetup {
 
     // Tone mapping for HDR-like effect
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.8;
+    this.renderer.toneMappingExposure = 0.5; // Reduced from 0.8 to 0.5
 
     // Output encoding
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;

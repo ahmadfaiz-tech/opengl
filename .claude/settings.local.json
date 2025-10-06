@@ -8,7 +8,8 @@
       "Read(//d/Projects/nasi-project/**)",
       "Bash(rm:*)",
       "Read(//c/Users/Admin/Pictures/Screenshots/**)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

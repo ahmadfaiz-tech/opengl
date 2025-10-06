@@ -16,6 +16,7 @@ import { ModelLoader } from './utils/ModelLoader.js'
 
 // Dynamic imports for code splitting
 let OrbitControls
+let TransformControls
 let gsap
 
 /**
@@ -48,6 +49,28 @@ class IglooExperience {
     this.lastFrameTime = performance.now()
     this.frameCount = 0
     this.fps = 60
+
+    // Selection system
+    this.selectedObject = null
+    this.selectedObjectName = null  // Track which object is selected
+    this.raycaster = new THREE.Raycaster()
+    this.mousePointer = new THREE.Vector2()
+
+    // Lighting system
+    this.sceneLights = {
+      ambient: null,
+      directional: [],
+      point: [],
+      hemisphere: null,
+      innerLights: []
+    }
+
+    // Lighting intensity multipliers
+    this.lightingSettings = {
+      global: 1.0,
+      ambient: 1.0,
+      inner: 1.0
+    }
 
     // Initialize
     this.initWithLoading()
@@ -115,6 +138,17 @@ class IglooExperience {
       this.iceGroundModel = null
     }
 
+    // Load snow mountain model
+    try {
+      console.log('📦 Starting to load snow mountain model...')
+      this.snowMountainModel = await modelLoader.loadIgloo('/models/snowmountain.glb')
+      console.log('✅ Snow mountain model loaded successfully!')
+    } catch (error) {
+      console.error('❌ Failed to load snow mountain model:', error)
+      console.warn('⚠️  Will proceed without mountain model')
+      this.snowMountainModel = null
+    }
+
     await this.loadingManager.simulateProgress(500)
   }
 
@@ -123,6 +157,10 @@ class IglooExperience {
       // Dynamic import OrbitControls
       const controlsModule = await import('three/examples/jsm/controls/OrbitControls')
       OrbitControls = controlsModule.OrbitControls
+
+      // Dynamic import TransformControls
+      const transformModule = await import('three/examples/jsm/controls/TransformControls')
+      TransformControls = transformModule.TransformControls
 
       // Dynamic import GSAP
       const gsapModule = await import('gsap')
@@ -161,7 +199,14 @@ class IglooExperience {
     // Environment Setup
     this.envSetup = new EnvironmentSetup(this.scene, this.renderer)
     this.envSetup.setupEnvironment()
-    this.envSetup.setupLighting()
+    const lights = this.envSetup.setupLighting()
+
+    // Store light references
+    this.sceneLights.ambient = lights.find(l => l.isAmbientLight)
+    this.sceneLights.hemisphere = lights.find(l => l.isHemisphereLight)
+    this.sceneLights.directional = lights.filter(l => l.isDirectionalLight)
+    this.sceneLights.point = lights.filter(l => l.isPointLight)
+
     this.envSetup.setupRenderer()
 
     // Apply HDRI if loaded
@@ -198,9 +243,13 @@ class IglooExperience {
     // Event Listeners
     window.addEventListener('resize', () => this.onResize())
     window.addEventListener('mousemove', (e) => this.onMouseMove(e))
+    window.addEventListener('click', (e) => this.onClick(e))
 
     // Initialize debug panel
     this.initDebugPanel()
+
+    // Setup selection system
+    this.setupSelectionSystem()
 
     // Start animation
     this.animate()
@@ -210,6 +259,39 @@ class IglooExperience {
     // Normalize mouse position to -1 to 1 range
     this.mouse.x = (event.clientX / this.sizes.width) * 2 - 1
     this.mouse.y = -(event.clientY / this.sizes.height) * 2 + 1
+
+    // Update mouse pointer for raycaster
+    this.mousePointer.x = (event.clientX / this.sizes.width) * 2 - 1
+    this.mousePointer.y = -(event.clientY / this.sizes.height) * 2 + 1
+  }
+
+  onClick(event) {
+    // Update raycaster with mouse position
+    this.raycaster.setFromCamera(this.mousePointer, this.camera)
+
+    // Check intersection with snow mountain first (higher priority)
+    if (this.snowMountainModel) {
+      const mountainIntersects = this.raycaster.intersectObject(this.snowMountainModel, true)
+      if (mountainIntersects.length > 0) {
+        this.selectObject(this.snowMountainModel, 'mountain')
+        console.log('✓ Snow mountain selected')
+        return
+      }
+    }
+
+    // Check intersection with ice ground
+    if (this.iceGroundModel) {
+      const groundIntersects = this.raycaster.intersectObject(this.iceGroundModel, true)
+      if (groundIntersects.length > 0) {
+        this.selectObject(this.iceGroundModel, 'ground')
+        console.log('✓ Ice ground selected')
+        return
+      }
+    }
+
+    // Clicked on empty space - deselect
+    this.deselectObject()
+    console.log('✓ Object deselected')
   }
 
   createIceScene() {
@@ -224,9 +306,47 @@ class IglooExperience {
       modelLoader.applyIceMaterial(this.iceGroundModel, this.iceTextures)
 
       // Position ground below igloo (lower than igloo base)
-      this.iceGroundModel.position.y = -5
+      // Check if saved position exists in localStorage
+      const savedPosition = this.loadIceGroundPosition()
+      if (savedPosition) {
+        this.iceGroundModel.position.set(savedPosition.x, savedPosition.y, savedPosition.z)
+        console.log('✅ Loaded saved ice ground position:', savedPosition)
+      } else {
+        this.iceGroundModel.position.y = -5
+        console.log('Using default ice ground position')
+      }
 
       this.scene.add(this.iceGroundModel)
+
+      // Setup Transform Controls for ice ground (after it's added to scene)
+      this.setupTransformControls()
+    } else {
+      console.warn('⚠️ Ice ground model not loaded - transform controls will not be available')
+    }
+
+    // Add snow mountain model if loaded
+    if (this.snowMountainModel) {
+      console.log('⛰️ Adding snow mountain model')
+
+      // Apply ice material to mountain
+      modelLoader.applyIceMaterial(this.snowMountainModel, this.iceTextures)
+
+      // Load saved position and rotation from localStorage
+      const savedData = this.loadMountainTransform()
+      if (savedData) {
+        this.snowMountainModel.position.set(savedData.position.x, savedData.position.y, savedData.position.z)
+        this.snowMountainModel.rotation.set(savedData.rotation.x, savedData.rotation.y, savedData.rotation.z)
+        console.log('✅ Loaded saved mountain position:', savedData.position)
+        console.log('✅ Loaded saved mountain rotation:', savedData.rotation)
+      } else {
+        // Default position (behind igloo)
+        this.snowMountainModel.position.set(-8, -3, -5)
+        console.log('Using default mountain position')
+      }
+
+      this.scene.add(this.snowMountainModel)
+    } else {
+      console.warn('⚠️ Snow mountain model not loaded')
     }
 
     // Use 3D model if loaded, otherwise use procedural
@@ -260,20 +380,26 @@ class IglooExperience {
       this.iceStructure = iceStructure
     }
 
-    // Add inner glow light inside igloo (warm orange/yellow glow)
-    const innerLight = new THREE.PointLight(0xffa040, 8, 10)
+    // Add inner glow light inside igloo (warm orange/yellow glow) - reduced intensity
+    const innerLight = new THREE.PointLight(0xffa040, 2, 10)
     innerLight.position.set(0, -0.5, 0)  // Inside igloo center
     innerLight.castShadow = false
+    innerLight.userData.baseIntensity = 2 // Store base intensity
     this.scene.add(innerLight)
+    this.sceneLights.innerLights.push(innerLight)
 
-    // Additional soft inner lights for better coverage
-    const innerLight2 = new THREE.PointLight(0xffb060, 5, 8)
+    // Additional soft inner lights for better coverage - reduced intensity
+    const innerLight2 = new THREE.PointLight(0xffb060, 1.5, 8)
     innerLight2.position.set(1, -0.8, 0)
+    innerLight2.userData.baseIntensity = 1.5
     this.scene.add(innerLight2)
+    this.sceneLights.innerLights.push(innerLight2)
 
-    const innerLight3 = new THREE.PointLight(0xffb060, 5, 8)
+    const innerLight3 = new THREE.PointLight(0xffb060, 1.5, 8)
     innerLight3.position.set(-1, -0.8, 0)
+    innerLight3.userData.baseIntensity = 1.5
     this.scene.add(innerLight3)
+    this.sceneLights.innerLights.push(innerLight3)
 
     // NO terrain, mountains, or fog - clean gradient background only
   }
@@ -374,6 +500,430 @@ class IglooExperience {
     }
   }
 
+  setupTransformControls() {
+    console.log('🎯 Setting up Transform Controls...')
+
+    if (!this.iceGroundModel) {
+      console.error('❌ Ice ground model not loaded, cannot setup transform controls')
+      return
+    }
+
+    console.log('✓ Ice ground model found:', this.iceGroundModel)
+
+    // Create TransformControls for ice ground
+    this.transformControl = new TransformControls(this.camera, this.renderer.domElement)
+
+    // Set size to make it visible (larger for distant camera)
+    this.transformControl.setSize(2)
+
+    // Attach to ice ground model
+    this.transformControl.attach(this.iceGroundModel)
+
+    // Set default mode
+    this.transformControl.setMode('translate')
+
+    // Start disabled and hidden
+    this.transformControl.enabled = false
+    this.transformControl.visible = false
+
+    // Set space to world (easier to use)
+    this.transformControl.setSpace('world')
+
+    console.log('✓ TransformControl created and attached')
+
+    // Add to scene
+    this.scene.add(this.transformControl)
+    console.log('✓ TransformControl added to scene')
+
+    // Disable OrbitControls when dragging transform control
+    this.transformControl.addEventListener('dragging-changed', (event) => {
+      if (this.controls) {
+        this.controls.enabled = !event.value
+      }
+      console.log('Dragging:', event.value)
+    })
+
+    // Log changes when transform happens
+    this.transformControl.addEventListener('objectChange', () => {
+      if (this.iceGroundModel) {
+        console.log('Ice Ground Position:', {
+          x: this.iceGroundModel.position.x.toFixed(2),
+          y: this.iceGroundModel.position.y.toFixed(2),
+          z: this.iceGroundModel.position.z.toFixed(2)
+        })
+      }
+    })
+
+    console.log('✅ Transform controls setup complete!')
+  }
+
+  setupSelectionSystem() {
+    console.log('🎯 Setting up selection system...')
+
+    // Create outline helper (orange line around selected object)
+    this.selectionOutline = null
+
+    // Arrow keys movement speed and rotation speed
+    this.movementSpeed = 0.1
+    this.fastMovementSpeed = 0.5
+    this.rotationSpeed = 0.05  // ~3 degrees
+
+    // Keyboard event listener for arrow keys (movement) and numeric keypad (rotation)
+    window.addEventListener('keydown', (e) => {
+      if (!this.selectedObject) return // Only move/rotate if something is selected
+
+      const speed = e.shiftKey ? this.fastMovementSpeed : this.movementSpeed
+      let moved = false
+      let rotated = false
+
+      // Arrow keys for movement
+      switch(e.key) {
+        case 'ArrowUp':
+          e.preventDefault()
+          this.selectedObject.position.y += speed
+          moved = true
+          console.log('↑ Moving UP')
+          break
+        case 'ArrowDown':
+          e.preventDefault()
+          this.selectedObject.position.y -= speed
+          moved = true
+          console.log('↓ Moving DOWN')
+          break
+        case 'ArrowLeft':
+          e.preventDefault()
+          this.selectedObject.position.x -= speed
+          moved = true
+          console.log('← Moving LEFT')
+          break
+        case 'ArrowRight':
+          e.preventDefault()
+          this.selectedObject.position.x += speed
+          moved = true
+          console.log('→ Moving RIGHT')
+          break
+      }
+
+      // Numeric keypad for rotation (8=pitch up, 2=pitch down, 4=yaw left, 6=yaw right)
+      switch(e.key) {
+        case '8':
+          e.preventDefault()
+          this.selectedObject.rotation.x += this.rotationSpeed
+          rotated = true
+          console.log('8️⃣ Rotating PITCH UP')
+          break
+        case '2':
+          e.preventDefault()
+          this.selectedObject.rotation.x -= this.rotationSpeed
+          rotated = true
+          console.log('2️⃣ Rotating PITCH DOWN')
+          break
+        case '4':
+          e.preventDefault()
+          this.selectedObject.rotation.y += this.rotationSpeed
+          rotated = true
+          console.log('4️⃣ Rotating YAW LEFT')
+          break
+        case '6':
+          e.preventDefault()
+          this.selectedObject.rotation.y -= this.rotationSpeed
+          rotated = true
+          console.log('6️⃣ Rotating YAW RIGHT')
+          break
+      }
+
+      if (moved) {
+        console.log('New Position:', {
+          x: this.selectedObject.position.x.toFixed(2),
+          y: this.selectedObject.position.y.toFixed(2),
+          z: this.selectedObject.position.z.toFixed(2)
+        })
+      }
+
+      if (rotated) {
+        console.log('New Rotation:', {
+          x: THREE.MathUtils.radToDeg(this.selectedObject.rotation.x).toFixed(2) + '°',
+          y: THREE.MathUtils.radToDeg(this.selectedObject.rotation.y).toFixed(2) + '°',
+          z: THREE.MathUtils.radToDeg(this.selectedObject.rotation.z).toFixed(2) + '°'
+        })
+      }
+    })
+
+    console.log('✅ Selection system setup complete!')
+  }
+
+  selectObject(object, objectName) {
+    this.selectedObject = object
+    this.selectedObjectName = objectName
+
+    // Remove old outline if exists
+    if (this.selectionOutline) {
+      this.scene.remove(this.selectionOutline)
+      this.selectionOutline.geometry.dispose()
+      this.selectionOutline.material.dispose()
+    }
+
+    // Create orange outline around object
+    const box = new THREE.Box3().setFromObject(object)
+    const size = box.getSize(new THREE.Vector3())
+    const center = box.getCenter(new THREE.Vector3())
+
+    // Create box helper with orange color
+    const boxGeometry = new THREE.BoxGeometry(size.x * 1.05, size.y * 1.05, size.z * 1.05)
+    const edges = new THREE.EdgesGeometry(boxGeometry)
+    const lineMaterial = new THREE.LineBasicMaterial({ color: 0xff8800, linewidth: 3 })
+    this.selectionOutline = new THREE.LineSegments(edges, lineMaterial)
+    this.selectionOutline.position.copy(center)
+
+    this.scene.add(this.selectionOutline)
+
+    // Update debug panel
+    if (this.selectionStateEl) {
+      const displayName = objectName === 'mountain' ? 'Mountain' : 'Ice Ground'
+      this.selectionStateEl.textContent = displayName
+      this.selectionStateEl.style.color = '#ff8800'
+    }
+
+    console.log(`✅ ${objectName} selected with orange outline`)
+  }
+
+  deselectObject() {
+    // Auto-save position when deselecting
+    if (this.selectedObjectName === 'ground' && this.iceGroundModel) {
+      this.saveIceGroundPosition()
+    } else if (this.selectedObjectName === 'mountain' && this.snowMountainModel) {
+      this.saveMountainTransform()
+    }
+
+    this.selectedObject = null
+    this.selectedObjectName = null
+
+    // Remove outline
+    if (this.selectionOutline) {
+      this.scene.remove(this.selectionOutline)
+      this.selectionOutline.geometry.dispose()
+      this.selectionOutline.material.dispose()
+      this.selectionOutline = null
+    }
+
+    // Update debug panel
+    if (this.selectionStateEl) {
+      this.selectionStateEl.textContent = 'No'
+      this.selectionStateEl.style.color = '#00ffff'
+    }
+
+    console.log('✅ Object deselected')
+  }
+
+  saveIceGroundPosition() {
+    if (!this.iceGroundModel) return
+
+    const position = {
+      x: this.iceGroundModel.position.x,
+      y: this.iceGroundModel.position.y,
+      z: this.iceGroundModel.position.z
+    }
+
+    localStorage.setItem('iceGroundPosition', JSON.stringify(position))
+    console.log('💾 Ice ground position saved to localStorage:', position)
+  }
+
+  loadIceGroundPosition() {
+    const saved = localStorage.getItem('iceGroundPosition')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        console.error('Failed to parse saved position:', e)
+        return null
+      }
+    }
+    return null
+  }
+
+  resetIceGroundPosition() {
+    if (!this.iceGroundModel) return
+
+    // Reset to default position
+    this.iceGroundModel.position.set(0, -5, 0)
+
+    // Clear localStorage
+    localStorage.removeItem('iceGroundPosition')
+
+    console.log('🔄 Ice ground position reset to default')
+  }
+
+  saveMountainTransform() {
+    if (!this.snowMountainModel) return
+
+    const transform = {
+      position: {
+        x: this.snowMountainModel.position.x,
+        y: this.snowMountainModel.position.y,
+        z: this.snowMountainModel.position.z
+      },
+      rotation: {
+        x: this.snowMountainModel.rotation.x,
+        y: this.snowMountainModel.rotation.y,
+        z: this.snowMountainModel.rotation.z
+      }
+    }
+
+    localStorage.setItem('mountainTransform', JSON.stringify(transform))
+    console.log('💾 Mountain position & rotation saved to localStorage:', transform)
+  }
+
+  loadMountainTransform() {
+    const saved = localStorage.getItem('mountainTransform')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        console.error('Failed to parse saved mountain transform:', e)
+        return null
+      }
+    }
+    return null
+  }
+
+  resetMountainTransform() {
+    if (!this.snowMountainModel) return
+
+    // Reset to default position and rotation
+    this.snowMountainModel.position.set(-8, -3, -5)
+    this.snowMountainModel.rotation.set(0, 0, 0)
+
+    // Clear localStorage
+    localStorage.removeItem('mountainTransform')
+
+    console.log('🔄 Mountain transform reset to default')
+  }
+
+  setupLightingControls() {
+    // Get slider elements
+    const globalSlider = document.getElementById('global-light-slider')
+    const ambientSlider = document.getElementById('ambient-light-slider')
+    const innerSlider = document.getElementById('inner-light-slider')
+
+    const globalValue = document.getElementById('global-light-value')
+    const ambientValue = document.getElementById('ambient-light-value')
+    const innerValue = document.getElementById('inner-light-value')
+
+    const resetLightingBtn = document.getElementById('reset-lighting-btn')
+
+    // Load saved settings
+    const saved = this.loadLightingSettings()
+    if (saved) {
+      this.lightingSettings = saved
+      globalSlider.value = saved.global * 100
+      ambientSlider.value = saved.ambient * 100
+      innerSlider.value = saved.inner * 100
+      this.applyLightingSettings()
+    }
+
+    // Global light slider
+    globalSlider.addEventListener('input', (e) => {
+      const value = e.target.value / 100
+      globalValue.textContent = `${e.target.value}%`
+      this.lightingSettings.global = value
+      this.applyLightingSettings()
+      this.saveLightingSettings()
+    })
+
+    // Ambient light slider
+    ambientSlider.addEventListener('input', (e) => {
+      const value = e.target.value / 100
+      ambientValue.textContent = `${e.target.value}%`
+      this.lightingSettings.ambient = value
+      this.applyLightingSettings()
+      this.saveLightingSettings()
+    })
+
+    // Inner light slider
+    innerSlider.addEventListener('input', (e) => {
+      const value = e.target.value / 100
+      innerValue.textContent = `${e.target.value}%`
+      this.lightingSettings.inner = value
+      this.applyLightingSettings()
+      this.saveLightingSettings()
+    })
+
+    // Reset lighting button
+    if (resetLightingBtn) {
+      resetLightingBtn.addEventListener('click', () => {
+        this.lightingSettings = { global: 1.0, ambient: 1.0, inner: 1.0 }
+        globalSlider.value = 100
+        ambientSlider.value = 100
+        innerSlider.value = 100
+        globalValue.textContent = '100%'
+        ambientValue.textContent = '100%'
+        innerValue.textContent = '100%'
+        this.applyLightingSettings()
+        this.saveLightingSettings()
+        console.log('🔄 Lighting reset to default')
+      })
+    }
+  }
+
+  applyLightingSettings() {
+    // Apply global multiplier to all lights except inner lights
+    const globalMult = this.lightingSettings.global
+    const ambientMult = this.lightingSettings.ambient
+    const innerMult = this.lightingSettings.inner
+
+    // Ambient light
+    if (this.sceneLights.ambient) {
+      this.sceneLights.ambient.intensity =
+        (this.sceneLights.ambient.userData.baseIntensity || 0.2) * globalMult * ambientMult
+    }
+
+    // Hemisphere light
+    if (this.sceneLights.hemisphere) {
+      this.sceneLights.hemisphere.intensity =
+        (this.sceneLights.hemisphere.userData.baseIntensity || 0.4) * globalMult
+    }
+
+    // Directional lights
+    this.sceneLights.directional.forEach(light => {
+      if (light.userData.baseIntensity !== undefined) {
+        light.intensity = light.userData.baseIntensity * globalMult
+      }
+    })
+
+    // Point lights (environment)
+    this.sceneLights.point.forEach(light => {
+      if (light.userData.baseIntensity !== undefined) {
+        light.intensity = light.userData.baseIntensity * globalMult
+      }
+    })
+
+    // Inner lights (separate control)
+    this.sceneLights.innerLights.forEach(light => {
+      if (light.userData.baseIntensity !== undefined) {
+        light.intensity = light.userData.baseIntensity * globalMult * innerMult
+      }
+    })
+
+    console.log('💡 Lighting updated:', this.lightingSettings)
+  }
+
+  saveLightingSettings() {
+    localStorage.setItem('lightingSettings', JSON.stringify(this.lightingSettings))
+  }
+
+  loadLightingSettings() {
+    const saved = localStorage.getItem('lightingSettings')
+    if (saved) {
+      try {
+        return JSON.parse(saved)
+      } catch (e) {
+        console.error('Failed to parse saved lighting settings:', e)
+        return null
+      }
+    }
+    return null
+  }
+
   initDebugPanel() {
     this.debugPanel = document.getElementById('debug-panel')
     this.debugMinimizeBtn = document.getElementById('debug-minimize')
@@ -384,7 +934,9 @@ class IglooExperience {
     this.cameraPosEl = document.getElementById('camera-pos')
     this.iglooPosEl = document.getElementById('igloo-pos')
     this.groundPosEl = document.getElementById('ground-pos')
+    this.mountainPosEl = document.getElementById('mountain-pos')
     this.fpsCounterEl = document.getElementById('fps-counter')
+    this.selectionStateEl = document.getElementById('selection-state')
 
     // Minimize/Maximize
     this.debugMinimizeBtn.addEventListener('click', () => {
@@ -401,6 +953,29 @@ class IglooExperience {
     this.rotationToggle.addEventListener('change', (e) => {
       this.toggleRotationMode(e.target.checked)
     })
+
+    // Lighting sliders
+    this.setupLightingControls()
+
+    // Save/Reset position buttons
+    const saveBtn = document.getElementById('save-position-btn')
+    const resetBtn = document.getElementById('reset-position-btn')
+
+    if (saveBtn) {
+      saveBtn.addEventListener('click', () => {
+        this.saveIceGroundPosition()
+        alert('✅ Ice ground position saved!')
+      })
+    }
+
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        if (confirm('Reset ice ground to default position?')) {
+          this.resetIceGroundPosition()
+          alert('🔄 Position reset to default!')
+        }
+      })
+    }
 
     // Keyboard shortcuts
     window.addEventListener('keydown', (e) => {
@@ -491,6 +1066,94 @@ class IglooExperience {
     }
   }
 
+  toggleTransformMode(enabled) {
+    console.log('🎯 toggleTransformMode called with enabled:', enabled)
+
+    if (!this.transformControl) {
+      console.error('❌ Transform controls not available! Check if ice ground model loaded.')
+      console.log('Ice ground model:', this.iceGroundModel)
+      return
+    }
+
+    console.log('✓ Transform control exists:', this.transformControl)
+
+    if (enabled) {
+      // Disable rotate mode if enabled
+      if (this.rotateToggle && this.rotateToggle.checked) {
+        this.rotateToggle.checked = false
+        console.log('✓ Disabled rotate mode')
+      }
+
+      // Enable transform (position) mode
+      this.transformControl.setMode('translate')
+      this.transformControl.enabled = true
+      this.transformControl.visible = true
+
+      console.log('✅ Transform mode ENABLED - drag arrows to move ice ground')
+      console.log('  - Control visible:', this.transformControl.visible)
+      console.log('  - Control enabled:', this.transformControl.enabled)
+      console.log('  - Control mode:', this.transformControl.mode)
+    } else {
+      // Disable and hide transform control
+      this.transformControl.enabled = false
+      this.transformControl.visible = false
+
+      // Log final position
+      if (this.iceGroundModel) {
+        console.log('💾 Ice Ground Final Position:', {
+          x: this.iceGroundModel.position.x.toFixed(2),
+          y: this.iceGroundModel.position.y.toFixed(2),
+          z: this.iceGroundModel.position.z.toFixed(2)
+        })
+      }
+      console.log('🔒 Transform mode disabled')
+    }
+  }
+
+  toggleRotateMode(enabled) {
+    console.log('🔄 toggleRotateMode called with enabled:', enabled)
+
+    if (!this.transformControl) {
+      console.error('❌ Transform controls not available! Check if ice ground model loaded.')
+      console.log('Ice ground model:', this.iceGroundModel)
+      return
+    }
+
+    console.log('✓ Transform control exists:', this.transformControl)
+
+    if (enabled) {
+      // Disable transform mode if enabled
+      if (this.transformToggle && this.transformToggle.checked) {
+        this.transformToggle.checked = false
+        console.log('✓ Disabled transform mode')
+      }
+
+      // Enable rotate mode
+      this.transformControl.setMode('rotate')
+      this.transformControl.enabled = true
+      this.transformControl.visible = true
+
+      console.log('✅ Rotate mode ENABLED - drag circles to rotate ice ground')
+      console.log('  - Control visible:', this.transformControl.visible)
+      console.log('  - Control enabled:', this.transformControl.enabled)
+      console.log('  - Control mode:', this.transformControl.mode)
+    } else {
+      // Disable and hide transform control
+      this.transformControl.enabled = false
+      this.transformControl.visible = false
+
+      // Log final rotation
+      if (this.iceGroundModel) {
+        console.log('💾 Ice Ground Final Rotation:', {
+          x: THREE.MathUtils.radToDeg(this.iceGroundModel.rotation.x).toFixed(2) + '°',
+          y: THREE.MathUtils.radToDeg(this.iceGroundModel.rotation.y).toFixed(2) + '°',
+          z: THREE.MathUtils.radToDeg(this.iceGroundModel.rotation.z).toFixed(2) + '°'
+        })
+      }
+      console.log('🔒 Rotate mode disabled')
+    }
+  }
+
   updateDebugInfo() {
     if (this.debugPanel.classList.contains('hidden')) return
 
@@ -509,6 +1172,13 @@ class IglooExperience {
       this.groundPosEl.textContent = `${this.iceGroundModel.position.x.toFixed(2)}, ${this.iceGroundModel.position.y.toFixed(2)}, ${this.iceGroundModel.position.z.toFixed(2)}`
     } else {
       this.groundPosEl.textContent = 'Not loaded'
+    }
+
+    // Update mountain position
+    if (this.snowMountainModel) {
+      this.mountainPosEl.textContent = `${this.snowMountainModel.position.x.toFixed(2)}, ${this.snowMountainModel.position.y.toFixed(2)}, ${this.snowMountainModel.position.z.toFixed(2)}`
+    } else {
+      this.mountainPosEl.textContent = 'Not loaded'
     }
 
     // Update FPS
@@ -557,6 +1227,13 @@ class IglooExperience {
     // Animate snow
     if (this.snowParticles && this.envSetup) {
       this.envSetup.animateSnow(this.snowParticles)
+    }
+
+    // Update selection outline position (follow selected object)
+    if (this.selectionOutline && this.selectedObject) {
+      const box = new THREE.Box3().setFromObject(this.selectedObject)
+      const center = box.getCenter(new THREE.Vector3())
+      this.selectionOutline.position.copy(center)
     }
 
     // Update debug info
