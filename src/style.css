@@ -126,7 +126,7 @@ body {
   position: fixed;
   top: 20px;
   right: 20px;
-  width: 320px;
+  width: 280px;
   background: rgba(0, 0, 0, 0.85);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -134,7 +134,7 @@ body {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   z-index: 999;
   font-family: 'Courier New', monospace;
-  font-size: 13px;
+  font-size: 11px;
   color: #fff;
   user-select: none;
   transition: all 0.3s ease;
@@ -156,7 +156,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 8px 12px;
   background: rgba(255, 255, 255, 0.05);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px 12px 0 0;
@@ -170,8 +170,8 @@ body {
 
 .debug-title {
   font-weight: bold;
-  font-size: 14px;
-  letter-spacing: 1px;
+  font-size: 12px;
+  letter-spacing: 0.5px;
 }
 
 .debug-controls {
@@ -202,14 +202,14 @@ body {
 }
 
 .debug-content {
-  padding: 16px;
+  padding: 12px;
   max-height: 70vh;
   overflow-y: auto;
 }
 
 .debug-section {
-  margin-bottom: 20px;
-  padding-bottom: 16px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -220,16 +220,16 @@ body {
 }
 
 .debug-section h3 {
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  margin-bottom: 12px;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
   color: #00ffff;
   font-weight: bold;
 }
 
 .debug-row {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 /* Toggle Switch */
@@ -238,7 +238,8 @@ body {
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-  gap: 12px;
+  gap: 8px;
+  font-size: 11px;
 }
 
 .toggle-checkbox {
@@ -278,9 +279,9 @@ body {
 }
 
 .debug-hint {
-  font-size: 11px;
+  font-size: 10px;
   color: rgba(255, 255, 255, 0.5);
-  margin-top: 8px;
+  margin-top: 4px;
   line-height: 1.4;
 }
 
@@ -288,17 +289,17 @@ body {
 .debug-info {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .info-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 10px;
+  padding: 4px 8px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .info-row span:first-child {
@@ -312,29 +313,29 @@ body {
 
 /* Keyboard Shortcuts */
 .shortcuts {
-  gap: 6px;
+  gap: 4px;
 }
 
 .shortcut-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 6px 10px;
+  gap: 8px;
+  padding: 4px 8px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .shortcut-row kbd {
   background: rgba(255, 255, 255, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  padding: 4px 8px;
+  padding: 3px 6px;
   border-radius: 4px;
   font-family: 'Courier New', monospace;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: bold;
   color: #00ffff;
-  min-width: 24px;
+  min-width: 20px;
   text-align: center;
 }
 
@@ -344,15 +345,15 @@ body {
 
 /* Slider Controls */
 .slider-control {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .slider-label {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 6px;
-  font-size: 12px;
+  margin-bottom: 4px;
+  font-size: 11px;
 }
 
 .slider-label span:first-child {
@@ -363,12 +364,13 @@ body {
   color: #00ffff;
   font-weight: bold;
   font-family: 'Courier New', monospace;
+  font-size: 11px;
 }
 
 /* Post-Processing Categories */
 .pp-category {
-  margin-bottom: 16px;
-  padding-bottom: 12px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -378,10 +380,10 @@ body {
 }
 
 .pp-category h4 {
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   color: rgba(255, 255, 255, 0.5);
   font-weight: normal;
 }
@@ -456,14 +458,14 @@ body {
 /* Action Buttons */
 .debug-action-btn {
   flex: 1;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: rgba(0, 255, 255, 0.1);
   border: 1px solid rgba(0, 255, 255, 0.3);
   color: #00ffff;
   border-radius: 6px;
   cursor: pointer;
   font-family: 'Courier New', monospace;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: bold;
   transition: all 0.2s;
 }
@@ -475,6 +477,37 @@ body {
 
 .debug-action-btn:active {
   transform: scale(0.95);
+}
+
+/* LUT Selector Dropdown */
+.lut-select {
+  width: 100%;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #fff;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.lut-select:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(0, 255, 255, 0.5);
+}
+
+.lut-select:focus {
+  border-color: #00ffff;
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.3);
+}
+
+.lut-select option {
+  background: #1a1a1a;
+  color: #fff;
+  padding: 6px;
 }
 
 /* Scrollbar */
@@ -500,14 +533,14 @@ body {
 .layers-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .layer-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: 6px;
+  padding: 4px 6px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 6px;
   cursor: pointer;
@@ -533,11 +566,11 @@ body {
   background: transparent;
   border: none;
   color: #fff;
-  font-size: 16px;
+  font-size: 14px;
   cursor: pointer;
   padding: 0;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -563,12 +596,12 @@ body {
 
 .layer-name {
   flex: 1;
-  font-size: 12px;
+  font-size: 11px;
   user-select: none;
 }
 
 .layer-lock {
-  font-size: 12px;
+  font-size: 11px;
   opacity: 0.5;
 }
 

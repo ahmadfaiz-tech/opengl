@@ -203,6 +203,45 @@
             </div>
             <input type="range" id="bloom-slider" class="light-slider" min="0" max="300" value="120" step="10">
           </div>
+
+          <!-- LUT Color Grading -->
+          <div class="slider-control">
+            <div class="slider-label">
+              <span>Color Preset (LUT)</span>
+            </div>
+            <select id="lut-selector" class="lut-select">
+              <option value="none">None</option>
+              <option value="neutral">Neutral</option>
+              <option value="cinematic">Cinematic</option>
+              <option value="warm">Warm</option>
+              <option value="cool">Cool</option>
+              <option value="vibrant">Vibrant</option>
+            </select>
+          </div>
+
+          <!-- LUT Intensity -->
+          <div class="slider-control">
+            <div class="slider-label">
+              <span>LUT Intensity</span>
+              <span id="lut-intensity-value" class="slider-value">100%</span>
+            </div>
+            <input type="range" id="lut-intensity-slider" class="light-slider" min="0" max="100" value="100" step="5">
+          </div>
+        </div>
+
+        <!-- Effect Toggles -->
+        <div class="pp-category">
+          <h4>Toggle Effects</h4>
+          <label class="toggle-label">
+            <span>Bloom Effect</span>
+            <input type="checkbox" id="bloom-toggle" class="toggle-checkbox" checked>
+            <span class="toggle-switch"></span>
+          </label>
+          <label class="toggle-label" style="margin-top: 8px;">
+            <span>Anti-aliasing (FXAA)</span>
+            <input type="checkbox" id="fxaa-toggle" class="toggle-checkbox" checked>
+            <span class="toggle-switch"></span>
+          </label>
         </div>
 
         <button id="reset-postprocessing-btn" class="debug-action-btn" style="margin-top: 12px; width: 100%;">🔄 Reset All</button>

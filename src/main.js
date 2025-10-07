@@ -3,12 +3,10 @@ import { EffectComposer } from 'postprocessing'
 import { RenderPass } from 'postprocessing'
 import { EffectPass } from 'postprocessing'
 import { BloomEffect } from 'postprocessing'
-import { VignetteEffect } from 'postprocessing'
-import { NoiseEffect } from 'postprocessing'
-import { ChromaticAberrationEffect } from 'postprocessing'
-import { ToneMappingEffect } from 'postprocessing'
 import { BrightnessContrastEffect } from 'postprocessing'
 import { HueSaturationEffect } from 'postprocessing'
+import { FXAAEffect } from 'postprocessing'
+import { LUT3DEffect } from 'postprocessing'
 import { CustomLoadingManager } from './utils/LoadingManager.js'
 import { IceBlockGenerator } from './utils/IceBlockGenerator.js'
 import { EnvironmentSetup } from './utils/EnvironmentSetup.js'
@@ -16,6 +14,7 @@ import { AdvancedTextureLoader } from './utils/TextureLoader.js'
 import { TerrainGenerator } from './utils/TerrainGenerator.js'
 import { ModelLoader } from './utils/ModelLoader.js'
 import { ColorGradingEffect } from './utils/ColorGradingEffect.js'
+import { LUTGenerator } from './utils/LUTGenerator.js'
 
 // Dynamic imports for code splitting
 let OrbitControls
@@ -249,7 +248,8 @@ class IglooExperience {
       alpha: false
     })
     this.renderer.setSize(this.sizes.width, this.sizes.height)
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    // Increase pixel ratio for sharper, photorealistic rendering
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3))
 
     // Environment Setup
     this.envSetup = new EnvironmentSetup(this.scene, this.renderer)
@@ -538,7 +538,10 @@ class IglooExperience {
 
   setupPostProcessing() {
     try {
-      this.composer = new EffectComposer(this.renderer)
+      // HDR-quality frame buffer for professional color grading
+      this.composer = new EffectComposer(this.renderer, {
+        frameBufferType: THREE.HalfFloatType  // HDR precision, no color clamping
+      })
 
       // Render pass
       const renderPass = new RenderPass(this.scene, this.camera)
@@ -575,33 +578,26 @@ class IglooExperience {
         clarity: 0
       })
 
-      // Vignette effect (very subtle - igloo.inc style)
-      const vignetteEffect = new VignetteEffect({
-        offset: 0.5,
-        darkness: 0.4
-      })
+      // FXAA for sharp antialiasing (essential for clean edges)
+      this.fxaaEffect = new FXAAEffect()
 
-      // Film grain (cinematic look)
-      const noiseEffect = new NoiseEffect({
-        premultiply: true
-      })
-      noiseEffect.blendMode.opacity.value = 0.2
+      // LUT3D effect will be added later when user loads a LUT file
+      // (Requires valid texture, can't initialize with null)
+      this.lut3DEffect = null
 
-      // Chromatic aberration (subtle color fringing)
-      const chromaticEffect = new ChromaticAberrationEffect({
-        offset: new THREE.Vector2(0.002, 0.002)
-      })
-
-      // Effect pass with all effects
+      // Effect pass with clean, professional effects only
+      // Order matters: Color adjustments -> Bloom -> AA
       const effectPass = new EffectPass(
         this.camera,
         this.brightnessContrastEffect,
         this.hueSaturationEffect,
         this.colorGradingEffect,
-        this.bloomEffect,
-        vignetteEffect,
-        noiseEffect,
-        chromaticEffect
+        this.bloomEffect,        // Subtle bloom
+        this.fxaaEffect          // Antialiasing for sharp edges
+        // NO chromatic aberration - destroys clarity
+        // NO film grain - makes image unclear
+        // NO vignette - unnecessary darkening
+        // LUT3D will be added dynamically when loaded
       )
       this.composer.addPass(effectPass)
 
@@ -651,7 +647,7 @@ class IglooExperience {
     this.camera.updateProjectionMatrix()
 
     this.renderer.setSize(this.sizes.width, this.sizes.height)
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 3))
 
     if (this.composer) {
       this.composer.setSize(this.sizes.width, this.sizes.height)
@@ -1554,7 +1550,9 @@ class IglooExperience {
       saturation: this.hueSaturationEffect ? this.hueSaturationEffect.saturation : 0,
       vibrance: 0,  // Not currently implemented
       clarity: this.colorGradingEffect ? this.colorGradingEffect.clarity : 0,
-      bloom: this.bloomEffect ? this.bloomEffect.intensity : 1.2
+      bloom: this.bloomEffect ? this.bloomEffect.intensity : 1.2,
+      bloomEnabled: this.bloomEffect ? this.bloomEffect.enabled : true,
+      fxaaEnabled: this.fxaaEffect ? this.fxaaEffect.enabled : true
     }
     localStorage.setItem('postProcessingSettings', JSON.stringify(settings))
   }
@@ -1695,7 +1693,161 @@ class IglooExperience {
       }
     }
 
+    // Apply bloom enabled state
+    if (settings.bloomEnabled !== undefined) {
+      const bloomToggle = document.getElementById('bloom-toggle')
+      if (bloomToggle) bloomToggle.checked = settings.bloomEnabled
+      if (this.bloomEffect) this.bloomEffect.enabled = settings.bloomEnabled
+    }
+
+    // Apply FXAA enabled state
+    if (settings.fxaaEnabled !== undefined) {
+      const fxaaToggle = document.getElementById('fxaa-toggle')
+      if (fxaaToggle) fxaaToggle.checked = settings.fxaaEnabled
+      if (this.fxaaEffect) this.fxaaEffect.enabled = settings.fxaaEnabled
+    }
+
     console.log('✅ Post-processing settings loaded and applied')
+  }
+
+  setupLUTControls() {
+    const lutSelector = document.getElementById('lut-selector')
+    const lutIntensitySlider = document.getElementById('lut-intensity-slider')
+    const lutIntensityValue = document.getElementById('lut-intensity-value')
+    const bloomToggle = document.getElementById('bloom-toggle')
+    const fxaaToggle = document.getElementById('fxaa-toggle')
+
+    if (!lutSelector) return
+
+    // Load saved LUT settings
+    const savedLUT = localStorage.getItem('selectedLUT')
+    const savedIntensity = localStorage.getItem('lutIntensity')
+
+    if (savedLUT) lutSelector.value = savedLUT
+    if (savedIntensity) {
+      lutIntensitySlider.value = savedIntensity
+      lutIntensityValue.textContent = `${savedIntensity}%`
+    }
+
+    // LUT selector change
+    lutSelector.addEventListener('change', async (e) => {
+      const lutName = e.target.value
+      await this.loadLUT(lutName)
+      localStorage.setItem('selectedLUT', lutName)
+    })
+
+    // LUT intensity slider
+    lutIntensitySlider.addEventListener('input', (e) => {
+      const intensity = parseFloat(e.target.value) / 100
+      lutIntensityValue.textContent = `${e.target.value}%`
+
+      if (this.lut3DEffect) {
+        this.lut3DEffect.blendMode.opacity.value = intensity
+      }
+      localStorage.setItem('lutIntensity', e.target.value)
+    })
+
+    // Bloom toggle
+    if (bloomToggle) {
+      bloomToggle.addEventListener('change', (e) => {
+        if (this.bloomEffect) {
+          this.bloomEffect.enabled = e.target.checked
+        }
+      })
+    }
+
+    // FXAA toggle
+    if (fxaaToggle) {
+      fxaaToggle.addEventListener('change', (e) => {
+        if (this.fxaaEffect) {
+          this.fxaaEffect.enabled = e.target.checked
+        }
+      })
+    }
+
+    // Load initial LUT if saved
+    if (savedLUT && savedLUT !== 'none') {
+      this.loadLUT(savedLUT)
+    }
+
+    console.log('✅ LUT controls setup complete!')
+  }
+
+  async loadLUT(lutName) {
+    if (lutName === 'none') {
+      // Remove LUT effect
+      if (this.lut3DEffect) {
+        this.lut3DEffect.enabled = false
+      }
+      console.log('🎨 LUT disabled')
+      return
+    }
+
+    console.log(`🎨 Loading LUT: ${lutName}`)
+
+    // Generate LUT texture
+    let lutTexture
+    switch(lutName) {
+      case 'neutral':
+        lutTexture = LUTGenerator.generateNeutralLUT()
+        break
+      case 'cinematic':
+        lutTexture = LUTGenerator.generateCinematicLUT()
+        break
+      case 'warm':
+        lutTexture = LUTGenerator.generateWarmLUT()
+        break
+      case 'cool':
+        lutTexture = LUTGenerator.generateCoolLUT()
+        break
+      case 'vibrant':
+        lutTexture = LUTGenerator.generateVibrantLUT()
+        break
+      default:
+        lutTexture = LUTGenerator.generateNeutralLUT()
+    }
+
+    // Create or update LUT effect
+    if (!this.lut3DEffect) {
+      // First time - create effect and recreate effect pass
+      this.lut3DEffect = new LUT3DEffect(lutTexture)
+      this.recreateEffectPass()
+    } else {
+      // Update existing effect
+      this.lut3DEffect.lut = lutTexture
+      this.lut3DEffect.enabled = true
+    }
+
+    // Apply saved intensity
+    const savedIntensity = localStorage.getItem('lutIntensity')
+    if (savedIntensity) {
+      this.lut3DEffect.blendMode.opacity.value = parseFloat(savedIntensity) / 100
+    }
+
+    console.log(`✅ LUT loaded: ${lutName}`)
+  }
+
+  recreateEffectPass() {
+    if (!this.composer) return
+
+    // Remove old effect pass (keep render pass)
+    if (this.composer.passes.length > 1) {
+      this.composer.removePass(this.composer.passes[1])
+    }
+
+    // Create new effect pass with LUT
+    const effectPass = new EffectPass(
+      this.camera,
+      this.brightnessContrastEffect,
+      this.hueSaturationEffect,
+      this.colorGradingEffect,
+      this.lut3DEffect,       // NOW WITH VALID TEXTURE
+      this.bloomEffect,
+      this.fxaaEffect
+    )
+    this.composer.addPass(effectPass)
+
+    console.log('✅ Effect pass recreated with LUT')
   }
 
   initDebugPanel() {
@@ -1744,6 +1896,9 @@ class IglooExperience {
 
     // Post-processing controls
     this.setupPostProcessingControls()
+
+    // LUT controls
+    this.setupLUTControls()
 
     // Focal length slider
     const focalLengthSlider = document.getElementById('focal-length-slider')
