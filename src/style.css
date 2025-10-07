@@ -75,8 +75,8 @@ body {
 /* UI Overlay */
 #ui-overlay {
   position: fixed;
-  top: 50px;
-  left: 70px;
+  top: 30px;
+  left: 50px;
   transform: none;
   text-align: left;
   z-index: 10;
@@ -88,37 +88,11 @@ body {
   opacity: 1;
 }
 
-.title {
-  font-size: 4rem;
-  font-weight: 700;
-  letter-spacing: 4px;
-  text-transform: uppercase;
-  background: linear-gradient(90deg, #00ffff, #ff00ff, #00ffff);
-  background-size: 200% auto;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: gradient 3s ease infinite;
-  margin-bottom: 20px;
-}
-
-.subtitle {
-  font-size: 1.2rem;
-  letter-spacing: 2px;
-  opacity: 0.7;
-  text-transform: uppercase;
-}
-
-@keyframes gradient {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
+.logo {
+  width: 280px;
+  height: auto;
+  object-fit: contain;
+  display: block;
 }
 
 /* Debug Panel */
@@ -607,13 +581,8 @@ body {
 
 /* Responsive */
 @media (max-width: 768px) {
-  .title {
-    font-size: 2.5rem;
-    letter-spacing: 2px;
-  }
-
-  .subtitle {
-    font-size: 1rem;
+  .logo {
+    width: 250px;
   }
 
   .debug-panel {
