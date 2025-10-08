@@ -430,7 +430,7 @@ export class RenderTargetTransition {
 
     if (timeSinceScroll >= this.autoSnapDelay) {
       // User hasn't scrolled for 2 seconds - smoothly snap to nearest page
-      const snapSpeed = 0.05 // Smooth snap animation speed
+      const snapSpeed = 0.003 // Very slow snap animation (~5 seconds to complete)
 
       if (this.transitionProgress >= this.snapThreshold) {
         // >= 50% progress → Smoothly complete to next page
