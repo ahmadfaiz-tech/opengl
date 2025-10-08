@@ -10,7 +10,8 @@
       "Read(//c/Users/Admin/Pictures/Screenshots/**)",
       "Bash(tree:*)",
       "Bash(cat:*)",
-      "WebFetch(domain:www.nexusmods.com)"
+      "WebFetch(domain:www.nexusmods.com)",
+      "Read(//d/Projects/transition_youtube_tutorial/**)"
     ],
     "deny": [],
     "ask": []

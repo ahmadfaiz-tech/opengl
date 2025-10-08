@@ -15,6 +15,7 @@ import { TerrainGenerator } from './utils/TerrainGenerator.js'
 import { ModelLoader } from './utils/ModelLoader.js'
 import { ColorGradingEffect } from './utils/ColorGradingEffect.js'
 import { LUTGenerator } from './utils/LUTGenerator.js'
+import { RenderTargetTransition } from './utils/RenderTargetTransition.js'
 
 // Dynamic imports for code splitting
 let OrbitControls
@@ -79,6 +80,10 @@ class IglooExperience {
       mountain2: true,
       mountain3: true
     }
+
+    // Transition system
+    this.transitionSystem = null
+    this.iceBlockModels = []
 
     // Initialize
     this.initWithLoading()
@@ -178,6 +183,27 @@ class IglooExperience {
       console.warn('⚠️  Will proceed without mountain 3 model')
       this.snowMountainModel3 = null
     }
+
+    // Load ice block models for pages 2-4 (DON'T add to scene yet - scene doesn't exist!)
+    console.log('🧊 Starting to load 3 ice block models...')
+    for (let i = 0; i < 3; i++) {
+      try {
+        console.log(`📦 Loading ice block ${i + 1}...`)
+        const iceBlock = await modelLoader.loadIgloo('/models/iceblock.glb')
+        modelLoader.applyIceMaterial(iceBlock, this.iceTextures)
+        modelLoader.scaleModel(iceBlock, 3)
+        iceBlock.visible = false
+        // DON'T add to scene yet - it doesn't exist!
+        this.iceBlockModels.push(iceBlock)
+        console.log(`✅ Ice block ${i + 1} loaded successfully!`, iceBlock)
+      } catch (error) {
+        console.error(`❌ Failed to load ice block ${i + 1}:`, error)
+        this.iceBlockModels.push(null)
+      }
+    }
+
+    console.log('🧊 Ice block loading complete. Total loaded:', this.iceBlockModels.length)
+    console.log('🧊 Ice block models array:', this.iceBlockModels)
 
     await this.loadingManager.simulateProgress(500)
   }
@@ -312,6 +338,9 @@ class IglooExperience {
 
     // Setup selection system
     this.setupSelectionSystem()
+
+    // Setup transition system
+    this.setupTransitionSystem()
 
     // Start animation
     this.animate()
@@ -536,6 +565,76 @@ class IglooExperience {
     // NO terrain, mountains, or fog - clean gradient background only
   }
 
+  /**
+   * Update page number display in debug panel
+   */
+  updatePageNumber(pageNum) {
+    if (this.debugPageNumber) {
+      this.debugPageNumber.textContent = pageNum.toString()
+      console.log(`📄 Page number updated to: ${pageNum}`)
+    }
+  }
+
+  setupTransitionSystem() {
+    console.log('📄 Setting up transition system...')
+    console.log('🔍 Ice block models array:', this.iceBlockModels)
+    console.log('🔍 Ice block models length:', this.iceBlockModels.length)
+
+    // Initialize with page change callback
+    this.transitionSystem = new RenderTargetTransition(
+      this.renderer,
+      this.scene,
+      this.camera,
+      (pageIndex) => this.updatePageNumber(pageIndex + 1) // pageIndex is 0-based, display is 1-based
+    )
+
+    // Page 1: Igloo (HDRI)
+    const iglooObjects = [this.iceStructure]
+    if (this.iceGroundModel) iglooObjects.push(this.iceGroundModel)
+    if (this.snowMountainModel) iglooObjects.push(this.snowMountainModel)
+    if (this.snowMountainModel2) iglooObjects.push(this.snowMountainModel2)
+    if (this.snowMountainModel3) iglooObjects.push(this.snowMountainModel3)
+    if (this.snowParticles) iglooObjects.push(this.snowParticles)
+
+    this.transitionSystem.registerPage({
+      name: 'Igloo',
+      background: this.hdriTexture,
+      environment: this.hdriTexture,
+      objects: iglooObjects
+    })
+
+    console.log('✅ Page 1 (Igloo) registered')
+
+    // Pages 2-4: Ice Blocks (plain background)
+    const plainBg = new THREE.Color(0xc8d4e0)
+
+    console.log('🔍 Attempting to register ice block pages...')
+    this.iceBlockModels.forEach((model, i) => {
+      console.log(`🔍 Ice block ${i}: model =`, model, 'is null?', !model)
+      if (!model) {
+        console.warn(`⚠️ Ice block ${i + 1} is null, skipping registration`)
+        return
+      }
+
+      // Add ice block to scene NOW (scene exists here!)
+      this.scene.add(model)
+      console.log(`✅ Ice block ${i + 1} added to scene`)
+
+      this.transitionSystem.registerPage({
+        name: `Ice Block ${i + 1}`,
+        background: plainBg,
+        environment: null,
+        objects: [model]
+      })
+      console.log(`✅ Page ${i + 2} (Ice Block ${i + 1}) registered`)
+    })
+
+    // Start listening
+    this.transitionSystem.startListening()
+
+    console.log(`✅ Transition system ready with ${this.transitionSystem.pages.length} pages`)
+  }
+
   setupPostProcessing() {
     try {
       // HDR-quality frame buffer for professional color grading
@@ -651,6 +750,11 @@ class IglooExperience {
 
     if (this.composer) {
       this.composer.setSize(this.sizes.width, this.sizes.height)
+    }
+
+    // Update transition render targets
+    if (this.transitionSystem) {
+      this.transitionSystem.handleResize(this.sizes.width, this.sizes.height)
     }
   }
 
@@ -1175,6 +1279,10 @@ class IglooExperience {
     const object = this.getObjectByName(objectName)
     if (object) {
       object.visible = this.layerVisibility[objectName]
+
+      // Store user's visibility choice so transition system respects it
+      if (!object.userData) object.userData = {}
+      object.userData.userHidden = !this.layerVisibility[objectName]
     }
 
     // Update eye icon
@@ -1218,6 +1326,10 @@ class IglooExperience {
       const object = this.getObjectByName(objectName)
       if (object) {
         object.visible = this.layerVisibility[objectName]
+
+        // Store user's visibility choice so transition system respects it
+        if (!object.userData) object.userData = {}
+        object.userData.userHidden = !this.layerVisibility[objectName]
       }
 
       // Update eye icon
@@ -1853,7 +1965,7 @@ class IglooExperience {
   initDebugPanel() {
     this.debugPanel = document.getElementById('debug-panel')
     this.debugMinimizeBtn = document.getElementById('debug-minimize')
-    this.debugCloseBtn = document.getElementById('debug-close')
+    this.debugPageNumber = document.getElementById('debug-page-number')
     this.rotationToggle = document.getElementById('rotation-toggle')
     this.cameraLockToggle = document.getElementById('camera-lock-toggle')
 
@@ -1871,11 +1983,6 @@ class IglooExperience {
     this.debugMinimizeBtn.addEventListener('click', () => {
       this.debugPanel.classList.toggle('minimized')
       this.debugMinimizeBtn.textContent = this.debugPanel.classList.contains('minimized') ? '+' : '−'
-    })
-
-    // Close panel
-    this.debugCloseBtn.addEventListener('click', () => {
-      this.debugPanel.classList.add('hidden')
     })
 
     // Rotation toggle
@@ -2227,8 +2334,16 @@ class IglooExperience {
     // Update debug info
     this.updateDebugInfo()
 
-    // Render with post-processing
-    if (this.composer) {
+    // Update transition system
+    if (this.transitionSystem) {
+      const deltaTime = this.clock.getDelta()
+      this.transitionSystem.update(deltaTime)
+    }
+
+    // Render with transition system
+    if (this.transitionSystem) {
+      this.transitionSystem.render()
+    } else if (this.composer) {
       this.composer.render()
     } else {
       this.renderer.render(this.scene, this.camera)
