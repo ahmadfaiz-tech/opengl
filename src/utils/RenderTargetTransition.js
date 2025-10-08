@@ -31,17 +31,32 @@ export class RenderTargetTransition {
     this.transitionQuad = null
 
     // Displacement texture for organic effect
-    this.displacementTexture = this.createDisplacementTexture()
+    this.displacementTexture = this.createProceduralDisplacement() // Fallback
+    this.loadCustomDisplacementTexture() // Try to load custom .jpg (async)
 
     // Scroll settings
     this.scrollSensitivity = 0.001
-    this.scrollThreshold = 0.3 // Start transition at 30% scroll
+    this.scrollThreshold = 0.1 // Start transition at 10% scroll (more responsive!)
     this.transitionSpeed = 0.005 // 10x slower for smooth, visible transitions
+
+    // Auto-snap settings (sticky pages)
+    this.lastScrollTime = 0
+    this.autoSnapDelay = 2000 // Wait 2 seconds after last scroll
+    this.snapThreshold = 0.5 // 50% - snap forward if >= 50%, snap back if < 50%
 
     // Bind methods
     this.onWheel = this.onWheel.bind(this)
 
-    this.init()
+    // Timeout fallback: if custom texture takes too long to load, proceed with procedural
+    setTimeout(() => {
+      if (!this.transitionMaterial) {
+        console.log('⏱️ Displacement load timeout - proceeding with current texture')
+        this.init()
+      }
+    }, 1000) // Wait max 1 second
+
+    // init() will be called by loadCustomDisplacementTexture() when texture loads
+    // or by timeout if load takes too long
   }
 
   /**
@@ -60,9 +75,57 @@ export class RenderTargetTransition {
   }
 
   /**
-   * Create displacement texture
+   * Load custom displacement texture from .jpg/.jpeg file
+   * Put your custom displacement map in: /public/textures/displacement/
    */
-  createDisplacementTexture() {
+  loadCustomDisplacementTexture() {
+    const loader = new THREE.TextureLoader()
+
+    // Try to load custom displacement map
+    // User can replace this with their own .jpg/.jpeg file!
+    const customPath = '/textures/displacement/custom.jpg'
+
+    console.log('🎨 Attempting to load custom displacement map from:', customPath)
+
+    loader.load(
+      customPath,
+      (texture) => {
+        // Success - use custom texture
+        texture.wrapS = THREE.RepeatWrapping
+        texture.wrapT = THREE.RepeatWrapping
+
+        this.displacementTexture = texture
+        console.log('✅ Custom displacement map loaded!')
+
+        // Initialize material with custom texture
+        if (!this.transitionMaterial) {
+          console.log('🎬 Creating transition material with custom displacement')
+          this.init()
+        } else {
+          // Material already created (by timeout), update it
+          this.transitionMaterial.uniforms.tDisplacement.value = texture
+          console.log('✅ Updated existing material with custom displacement')
+        }
+      },
+      undefined,
+      (error) => {
+        // Failed to load - use procedural fallback (already set in constructor)
+        console.log('ℹ️ Custom displacement map not found, using procedural noise')
+        console.log('   To use custom: place .jpg file at /public/textures/displacement/custom.jpg')
+
+        // Initialize with procedural fallback
+        if (!this.transitionMaterial) {
+          console.log('🎬 Creating transition material with procedural displacement')
+          this.init()
+        }
+      }
+    )
+  }
+
+  /**
+   * Create procedural displacement texture (fallback)
+   */
+  createProceduralDisplacement() {
     const size = 256
     const canvas = document.createElement('canvas')
     canvas.width = size
@@ -146,21 +209,19 @@ export class RenderTargetTransition {
         // Sample displacement map
         vec4 disp = texture2D(tDisplacement, uv);
 
-        // Create organic noise
-        float noiseFactor = noise(gl_FragCoord.xy * 0.4);
+        // Use pure displacement texture (no extra noise)
+        // This shows your custom displacement map clearly!
+        float displacement = disp.r;
 
-        // Combine displacement with noise
-        float displacement = (disp.r + noiseFactor) * 0.5;
-
-        // Distort UVs based on progress
+        // Distort UVs based on progress (both X and Y for water caustics effect)
         vec2 distortedUV1 = vec2(
           uv.x + uProgress * displacement * uIntensity,
-          uv.y
+          uv.y + uProgress * displacement * uIntensity * 0.5
         );
 
         vec2 distortedUV2 = vec2(
           uv.x - (1.0 - uProgress) * displacement * uIntensity,
-          uv.y
+          uv.y - (1.0 - uProgress) * displacement * uIntensity * 0.5
         );
 
         // Sample both scenes with distorted UVs
@@ -180,7 +241,7 @@ export class RenderTargetTransition {
         tScene2: { value: null },
         tDisplacement: { value: this.displacementTexture },
         uProgress: { value: 0.0 },
-        uIntensity: { value: 0.3 }
+        uIntensity: { value: 2.0 } // Increased for custom displacement visibility
       },
       vertexShader,
       fragmentShader,
@@ -237,38 +298,62 @@ export class RenderTargetTransition {
   }
 
   /**
-   * Handle wheel scroll
+   * Handle wheel scroll - controls transition progress in real-time
    */
   onWheel(event) {
     console.log('🎡 Wheel event detected:', event.deltaY)
     event.preventDefault()
 
-    if (this.isTransitioning) {
-      console.log('⏸️ Already transitioning, skipping')
-      return
-    }
+    // Track last scroll time for auto-snap behavior
+    this.lastScrollTime = Date.now()
 
-    // Update scroll progress (allow negative for scroll up)
-    this.scrollProgress += event.deltaY * this.scrollSensitivity
+    if (!this.isTransitioning) {
+      // Not transitioning - accumulate scroll to trigger transition
+      this.scrollProgress += event.deltaY * this.scrollSensitivity
 
-    console.log('📊 Scroll progress:', this.scrollProgress.toFixed(3), '/ Threshold:', this.scrollThreshold)
+      console.log('📊 Scroll progress:', this.scrollProgress.toFixed(3), '/ Threshold:', this.scrollThreshold)
 
-    // Start transition when threshold reached in EITHER direction
-    if (Math.abs(this.scrollProgress) >= this.scrollThreshold) {
-      // Determine direction from sign of scrollProgress
-      const direction = this.scrollProgress > 0 ? 1 : -1
-      const newPage = this.currentPage + direction
+      // Start transition when threshold reached
+      if (Math.abs(this.scrollProgress) >= this.scrollThreshold) {
+        const direction = this.scrollProgress > 0 ? 1 : -1
+        const newPage = this.currentPage + direction
 
-      console.log('🎯 Attempting transition: current =', this.currentPage, 'target =', newPage, 'total pages =', this.pages.length)
+        console.log('🎯 Attempting transition: current =', this.currentPage, 'target =', newPage, 'total pages =', this.pages.length)
 
-      if (newPage >= 0 && newPage < this.pages.length) {
-        this.targetPage = newPage
-        this.startTransition()
-      } else {
-        console.log('⚠️ Cannot transition: out of bounds')
+        if (newPage >= 0 && newPage < this.pages.length) {
+          this.targetPage = newPage
+          this.startTransition()
+          this.scrollProgress = 0 // Reset to start controlling transition progress
+        } else {
+          console.log('⚠️ Cannot transition: out of bounds')
+          this.scrollProgress = 0
+        }
+      }
+    } else {
+      // Already transitioning - user controls transition progress with scroll
+      this.scrollProgress += event.deltaY * this.scrollSensitivity
+
+      // Map scroll to transition progress (0 to 1.0 range)
+      // Use ABSOLUTE value to handle both forward and reverse scrolling
+      const scrollRange = 1.0 // Total scroll distance needed to complete transition
+      const absScrollProgress = Math.abs(this.scrollProgress)
+      this.transitionProgress = absScrollProgress / scrollRange
+
+      // Clamp to 0-1 range
+      this.transitionProgress = Math.max(0, Math.min(1, this.transitionProgress))
+
+      console.log('📊 Transition progress:', (this.transitionProgress * 100).toFixed(1) + '%', 'scroll:', this.scrollProgress.toFixed(3))
+
+      // Check completion
+      if (this.transitionProgress >= 1.0) {
+        this.transitionProgress = 1.0
+        this.completeTransition()
       }
 
-      this.scrollProgress = 0
+      // Update shader
+      if (this.transitionMaterial) {
+        this.transitionMaterial.uniforms.uProgress.value = this.transitionProgress
+      }
     }
   }
 
@@ -335,25 +420,41 @@ export class RenderTargetTransition {
 
   /**
    * Update transition (call in animation loop)
+   * Handles auto-snap behavior when user stops scrolling
    */
   update(deltaTime) {
     if (!this.isTransitioning) return
 
-    // Smooth progress
-    this.transitionProgress += this.transitionSpeed
+    // Check if user stopped scrolling (sticky/snap behavior)
+    const timeSinceScroll = Date.now() - this.lastScrollTime
 
-    if (this.transitionProgress >= 1.0) {
-      this.transitionProgress = 1.0
-      this.completeTransition()
-    }
+    if (timeSinceScroll >= this.autoSnapDelay) {
+      // User hasn't scrolled for 2 seconds - smoothly snap to nearest page
+      const snapSpeed = 0.05 // Smooth snap animation speed
 
-    // Update shader uniform
-    if (this.transitionMaterial) {
-      this.transitionMaterial.uniforms.uProgress.value = this.transitionProgress
+      if (this.transitionProgress >= this.snapThreshold) {
+        // >= 50% progress → Smoothly complete to next page
+        this.transitionProgress += snapSpeed
 
-      // Log progress every 10%
-      if (Math.floor(this.transitionProgress * 10) !== Math.floor((this.transitionProgress - this.transitionSpeed) * 10)) {
-        console.log('⏳ Transition progress:', (this.transitionProgress * 100).toFixed(0) + '%')
+        if (this.transitionProgress >= 1.0) {
+          this.transitionProgress = 1.0
+          this.completeTransition()
+          console.log('📍 Snapped FORWARD to next page')
+        }
+      } else {
+        // < 50% progress → Smoothly cancel back to original page
+        this.transitionProgress -= snapSpeed
+
+        if (this.transitionProgress <= 0) {
+          this.transitionProgress = 0
+          this.cancelTransition()
+          console.log('📍 Snapped BACK to original page')
+        }
+      }
+
+      // Update shader during snap animation
+      if (this.transitionMaterial) {
+        this.transitionMaterial.uniforms.uProgress.value = Math.max(0, Math.min(1, this.transitionProgress))
       }
     }
   }
@@ -376,6 +477,20 @@ export class RenderTargetTransition {
     }
 
     console.log(`✅ Transition complete: Now on ${toPage.name}`)
+  }
+
+  /**
+   * Cancel transition - user scrolled back, revert to original page
+   */
+  cancelTransition() {
+    const fromPage = this.pages[this.currentPage]
+
+    // Reset to original page
+    this.isTransitioning = false
+    this.transitionProgress = 0
+    this.scrollProgress = 0
+
+    console.log(`↩️ Transition cancelled: Staying on ${fromPage.name}`)
   }
 
   /**
