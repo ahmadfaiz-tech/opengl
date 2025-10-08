@@ -300,17 +300,14 @@ export class RenderTargetTransition {
     const page = this.pages[pageIndex]
     if (!page) return
 
-    // Set background
+    // Set background and environment for this page
     const originalBackground = this.scene.background
     const originalEnvironment = this.scene.environment
 
-    if (page.background) {
-      this.scene.background = page.background
-    }
-
-    if (page.environment !== undefined) {
-      this.scene.environment = page.environment
-    }
+    // ALWAYS explicitly set background and environment (no conditionals!)
+    // This prevents background "bleeding" between pages during transitions
+    this.scene.background = page.background
+    this.scene.environment = page.environment
 
     // Hide all other pages, but respect user's layer visibility settings
     this.pages.forEach((p, i) => {
@@ -399,10 +396,29 @@ export class RenderTargetTransition {
       this.renderer.clear()
       this.renderer.render(this.transitionScene, this.transitionCamera)
     } else {
-      // Normal rendering (current page only)
-      this.renderPageToTarget(this.currentPage)
+      // Normal rendering - render current page directly to screen
+      const page = this.pages[this.currentPage]
+      if (!page) return
 
-      // Render to screen
+      // Set page background/environment (DON'T restore after - keep it!)
+      this.scene.background = page.background
+      this.scene.environment = page.environment
+
+      // Show only current page objects (respect user visibility settings)
+      this.pages.forEach((p, i) => {
+        p.objects.forEach(obj => {
+          if (i === this.currentPage) {
+            // Show this page's objects ONLY if user hasn't hidden them
+            const userHasHidden = obj.userData && obj.userData.userHidden
+            obj.visible = !userHasHidden
+          } else {
+            // Hide objects from other pages
+            obj.visible = false
+          }
+        })
+      })
+
+      // Render directly to screen
       this.renderer.setRenderTarget(null)
       this.renderer.clear()
       this.renderer.render(this.scene, this.camera)
