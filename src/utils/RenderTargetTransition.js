@@ -214,15 +214,15 @@ export class RenderTargetTransition {
         // This shows your custom displacement map clearly!
         float displacement = disp.r;
 
-        // Distort UVs based on progress (both X and Y for water caustics effect)
+        // Distort UVs based on progress (pure vertical downward - 90 degrees)
         vec2 distortedUV1 = vec2(
-          uv.x + uProgress * displacement * uIntensity,
-          uv.y + uProgress * displacement * uIntensity * 0.5
+          uv.x,
+          uv.y - uProgress * displacement * uIntensity
         );
 
         vec2 distortedUV2 = vec2(
-          uv.x - (1.0 - uProgress) * displacement * uIntensity,
-          uv.y - (1.0 - uProgress) * displacement * uIntensity * 0.5
+          uv.x,
+          uv.y + (1.0 - uProgress) * displacement * uIntensity
         );
 
         // Sample both scenes with distorted UVs
