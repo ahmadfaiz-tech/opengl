@@ -5,11 +5,12 @@ import * as THREE from 'three'
  * Based on YouTube tutorial approach
  */
 export class RenderTargetTransition {
-  constructor(renderer, scene, camera, onPageChange = null) {
+  constructor(renderer, scene, camera, onPageChange = null, composer = null) {
     this.renderer = renderer
     this.scene = scene
     this.camera = camera
     this.onPageChange = onPageChange // Callback for page changes
+    this.composer = composer // Optional post-processing composer
 
     // State
     this.currentPage = 0
@@ -533,10 +534,17 @@ export class RenderTargetTransition {
         })
       })
 
-      // Render directly to screen
+      // Render to screen (with post-processing if composer available)
       this.renderer.setRenderTarget(null)
-      this.renderer.clear()
-      this.renderer.render(this.scene, this.camera)
+
+      if (this.composer) {
+        // Use post-processing composer for bloom, FXAA, color grading
+        this.composer.render()
+      } else {
+        // Fallback to direct rendering without post-processing
+        this.renderer.clear()
+        this.renderer.render(this.scene, this.camera)
+      }
     }
   }
 

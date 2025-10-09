@@ -1,0 +1,10 @@
+{
+  "_comment": "This file will be populated with exported settings before production deploy",
+  "_instructions": [
+    "1. In development: Adjust all settings in debug panel",
+    "2. Click 'Export Settings' button to download igloo-settings.json",
+    "3. Replace this file with the downloaded file",
+    "4. Deploy to production - settings will auto-load"
+  ],
+  "_note": "This placeholder file will be overwritten. Leave it empty for now."
+}

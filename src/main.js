@@ -75,7 +75,6 @@ class IglooExperience {
 
     // Layer visibility tracking
     this.layerVisibility = {
-      ground: true,
       mountain1: true,
       mountain2: true,
       mountain3: true
@@ -103,7 +102,7 @@ class IglooExperience {
     await this.loadAssets()
 
     // Initialize scene
-    this.init()
+    await this.init()
 
     // Complete loading
     await this.loadingManager.simulateProgress(500)
@@ -138,17 +137,6 @@ class IglooExperience {
       console.error('Error details:', error.message)
       console.warn('⚠️  Will use procedural igloo instead')
       this.iglooModel = null
-    }
-
-    // Load ice ground model
-    try {
-      console.log('📦 Starting to load ice ground model...')
-      this.iceGroundModel = await modelLoader.loadIgloo('/models/ice_ground.glb')
-      console.log('✅ Ice ground model loaded successfully!')
-    } catch (error) {
-      console.error('❌ Failed to load ice ground model:', error)
-      console.warn('⚠️  Will proceed without ground model')
-      this.iceGroundModel = null
     }
 
     // Load snow mountain model
@@ -228,7 +216,7 @@ class IglooExperience {
     }
   }
 
-  init() {
+  async init() {
     // Scene
     this.scene = new THREE.Scene()
 
@@ -342,6 +330,9 @@ class IglooExperience {
     // Setup transition system
     this.setupTransitionSystem()
 
+    // Load default settings from JSON file (production) or localStorage (development)
+    await this.loadDefaultSettings()
+
     // Start animation
     this.animate()
   }
@@ -390,16 +381,6 @@ class IglooExperience {
       }
     }
 
-    // Check intersection with ice ground
-    if (this.iceGroundModel) {
-      const groundIntersects = this.raycaster.intersectObject(this.iceGroundModel, true)
-      if (groundIntersects.length > 0) {
-        this.selectObject(this.iceGroundModel, 'ground')
-        console.log('✓ Ice ground selected')
-        return
-      }
-    }
-
     // Clicked on empty space - deselect
     this.deselectObject()
     console.log('✓ Object deselected')
@@ -408,32 +389,6 @@ class IglooExperience {
   createIceScene() {
     const terrainGen = new TerrainGenerator()
     const modelLoader = new ModelLoader()
-
-    // Add ice ground model if loaded
-    if (this.iceGroundModel) {
-      console.log('🌍 Adding ice ground model')
-
-      // Apply ice material to ground
-      modelLoader.applyIceMaterial(this.iceGroundModel, this.iceTextures)
-
-      // Position ground below igloo (lower than igloo base)
-      // Check if saved position exists in localStorage
-      const savedPosition = this.loadIceGroundPosition()
-      if (savedPosition) {
-        this.iceGroundModel.position.set(savedPosition.x, savedPosition.y, savedPosition.z)
-        console.log('✅ Loaded saved ice ground position:', savedPosition)
-      } else {
-        this.iceGroundModel.position.y = -5
-        console.log('Using default ice ground position')
-      }
-
-      this.scene.add(this.iceGroundModel)
-
-      // Setup Transform Controls for ice ground (after it's added to scene)
-      this.setupTransformControls()
-    } else {
-      console.warn('⚠️ Ice ground model not loaded - transform controls will not be available')
-    }
 
     // Add snow mountain model if loaded
     if (this.snowMountainModel) {
@@ -580,17 +535,17 @@ class IglooExperience {
     console.log('🔍 Ice block models array:', this.iceBlockModels)
     console.log('🔍 Ice block models length:', this.iceBlockModels.length)
 
-    // Initialize with page change callback
+    // Initialize with page change callback and composer
     this.transitionSystem = new RenderTargetTransition(
       this.renderer,
       this.scene,
       this.camera,
-      (pageIndex) => this.updatePageNumber(pageIndex + 1) // pageIndex is 0-based, display is 1-based
+      (pageIndex) => this.updatePageNumber(pageIndex + 1), // pageIndex is 0-based, display is 1-based
+      this.composer // Pass composer for post-processing effects (bloom, FXAA, color grading)
     )
 
     // Page 1: Igloo (HDRI)
     const iglooObjects = [this.iceStructure]
-    if (this.iceGroundModel) iglooObjects.push(this.iceGroundModel)
     if (this.snowMountainModel) iglooObjects.push(this.snowMountainModel)
     if (this.snowMountainModel2) iglooObjects.push(this.snowMountainModel2)
     if (this.snowMountainModel3) iglooObjects.push(this.snowMountainModel3)
@@ -756,63 +711,6 @@ class IglooExperience {
     if (this.transitionSystem) {
       this.transitionSystem.handleResize(this.sizes.width, this.sizes.height)
     }
-  }
-
-  setupTransformControls() {
-    console.log('🎯 Setting up Transform Controls...')
-
-    if (!this.iceGroundModel) {
-      console.error('❌ Ice ground model not loaded, cannot setup transform controls')
-      return
-    }
-
-    console.log('✓ Ice ground model found:', this.iceGroundModel)
-
-    // Create TransformControls for ice ground
-    this.transformControl = new TransformControls(this.camera, this.renderer.domElement)
-
-    // Set size to make it visible (larger for distant camera)
-    this.transformControl.setSize(2)
-
-    // Attach to ice ground model
-    this.transformControl.attach(this.iceGroundModel)
-
-    // Set default mode
-    this.transformControl.setMode('translate')
-
-    // Start disabled and hidden
-    this.transformControl.enabled = false
-    this.transformControl.visible = false
-
-    // Set space to world (easier to use)
-    this.transformControl.setSpace('world')
-
-    console.log('✓ TransformControl created and attached')
-
-    // Add to scene
-    this.scene.add(this.transformControl)
-    console.log('✓ TransformControl added to scene')
-
-    // Disable OrbitControls when dragging transform control
-    this.transformControl.addEventListener('dragging-changed', (event) => {
-      if (this.controls) {
-        this.controls.enabled = !event.value
-      }
-      console.log('Dragging:', event.value)
-    })
-
-    // Log changes when transform happens
-    this.transformControl.addEventListener('objectChange', () => {
-      if (this.iceGroundModel) {
-        console.log('Ice Ground Position:', {
-          x: this.iceGroundModel.position.x.toFixed(2),
-          y: this.iceGroundModel.position.y.toFixed(2),
-          z: this.iceGroundModel.position.z.toFixed(2)
-        })
-      }
-    })
-
-    console.log('✅ Transform controls setup complete!')
   }
 
   setupSelectionSystem() {
@@ -996,44 +894,6 @@ class IglooExperience {
     console.log('✅ Object deselected')
   }
 
-  saveIceGroundPosition() {
-    if (!this.iceGroundModel) return
-
-    const position = {
-      x: this.iceGroundModel.position.x,
-      y: this.iceGroundModel.position.y,
-      z: this.iceGroundModel.position.z
-    }
-
-    localStorage.setItem('iceGroundPosition', JSON.stringify(position))
-    console.log('💾 Ice ground position saved to localStorage:', position)
-  }
-
-  loadIceGroundPosition() {
-    const saved = localStorage.getItem('iceGroundPosition')
-    if (saved) {
-      try {
-        return JSON.parse(saved)
-      } catch (e) {
-        console.error('Failed to parse saved position:', e)
-        return null
-      }
-    }
-    return null
-  }
-
-  resetIceGroundPosition() {
-    if (!this.iceGroundModel) return
-
-    // Reset to default position
-    this.iceGroundModel.position.set(0, -5, 0)
-
-    // Clear localStorage
-    localStorage.removeItem('iceGroundPosition')
-
-    console.log('🔄 Ice ground position reset to default')
-  }
-
   saveMountainTransform() {
     if (!this.snowMountainModel) return
 
@@ -1172,6 +1032,317 @@ class IglooExperience {
     console.log('🔄 Mountain 3 transform reset to default')
   }
 
+  /**
+   * Export all current settings to JSON file
+   * Use this before deploy to save perfect layout
+   */
+  exportSettings() {
+    console.log('📥 Exporting settings...')
+
+    const settings = {
+      version: '1.0.0',
+      timestamp: new Date().toISOString(),
+      camera: {
+        position: {
+          x: this.camera.position.x,
+          y: this.camera.position.y,
+          z: this.camera.position.z
+        },
+        target: this.controls ? {
+          x: this.controls.target.x,
+          y: this.controls.target.y,
+          z: this.controls.target.z
+        } : { x: 0, y: 0, z: 0 },
+        fov: this.camera.fov,
+        focalLength: this.fovToFocalLength(this.camera.fov)
+      },
+      objects: {
+        mountain1: this.snowMountainModel ? {
+          position: {
+            x: this.snowMountainModel.position.x,
+            y: this.snowMountainModel.position.y,
+            z: this.snowMountainModel.position.z
+          },
+          rotation: {
+            x: this.snowMountainModel.rotation.x,
+            y: this.snowMountainModel.rotation.y,
+            z: this.snowMountainModel.rotation.z
+          }
+        } : null,
+        mountain2: this.snowMountainModel2 ? {
+          position: {
+            x: this.snowMountainModel2.position.x,
+            y: this.snowMountainModel2.position.y,
+            z: this.snowMountainModel2.position.z
+          },
+          rotation: {
+            x: this.snowMountainModel2.rotation.x,
+            y: this.snowMountainModel2.rotation.y,
+            z: this.snowMountainModel2.rotation.z
+          }
+        } : null,
+        mountain3: this.snowMountainModel3 ? {
+          position: {
+            x: this.snowMountainModel3.position.x,
+            y: this.snowMountainModel3.position.y,
+            z: this.snowMountainModel3.position.z
+          },
+          rotation: {
+            x: this.snowMountainModel3.rotation.x,
+            y: this.snowMountainModel3.rotation.y,
+            z: this.snowMountainModel3.rotation.z
+          }
+        } : null
+      },
+      lighting: {
+        globalIntensity: this.globalLightIntensity || 1.0
+      },
+      postProcessing: this.currentPostProcessing || {},
+      lut: {
+        preset: this.currentLUTPreset || 'none',
+        intensity: this.lutIntensity || 1.0
+      },
+      effects: {
+        bloomEnabled: this.bloomEnabled !== undefined ? this.bloomEnabled : true,
+        fxaaEnabled: this.fxaaEnabled !== undefined ? this.fxaaEnabled : true
+      },
+      layers: {
+        visibility: this.layerVisibility || {}
+      }
+    }
+
+    // Create JSON blob and download
+    const json = JSON.stringify(settings, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'igloo-settings.json'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    console.log('✅ Settings exported successfully!')
+    console.log('📋 Settings:', settings)
+  }
+
+  /**
+   * Import settings from JSON file
+   */
+  async importSettings(file) {
+    console.log('📤 Importing settings from file:', file.name)
+
+    try {
+      const text = await file.text()
+      const settings = JSON.parse(text)
+
+      console.log('📋 Loaded settings:', settings)
+
+      // Apply camera settings
+      if (settings.camera) {
+        if (settings.camera.position) {
+          this.camera.position.set(
+            settings.camera.position.x,
+            settings.camera.position.y,
+            settings.camera.position.z
+          )
+        }
+        if (settings.camera.target && this.controls) {
+          this.controls.target.set(
+            settings.camera.target.x,
+            settings.camera.target.y,
+            settings.camera.target.z
+          )
+        }
+        if (settings.camera.fov) {
+          this.camera.fov = settings.camera.fov
+          this.camera.updateProjectionMatrix()
+        }
+      }
+
+      // Apply object transforms
+      if (settings.objects) {
+        if (settings.objects.mountain1 && this.snowMountainModel) {
+          this.snowMountainModel.position.set(
+            settings.objects.mountain1.position.x,
+            settings.objects.mountain1.position.y,
+            settings.objects.mountain1.position.z
+          )
+          this.snowMountainModel.rotation.set(
+            settings.objects.mountain1.rotation.x,
+            settings.objects.mountain1.rotation.y,
+            settings.objects.mountain1.rotation.z
+          )
+        }
+        if (settings.objects.mountain2 && this.snowMountainModel2) {
+          this.snowMountainModel2.position.set(
+            settings.objects.mountain2.position.x,
+            settings.objects.mountain2.position.y,
+            settings.objects.mountain2.position.z
+          )
+          this.snowMountainModel2.rotation.set(
+            settings.objects.mountain2.rotation.x,
+            settings.objects.mountain2.rotation.y,
+            settings.objects.mountain2.rotation.z
+          )
+        }
+        if (settings.objects.mountain3 && this.snowMountainModel3) {
+          this.snowMountainModel3.position.set(
+            settings.objects.mountain3.position.x,
+            settings.objects.mountain3.position.y,
+            settings.objects.mountain3.position.z
+          )
+          this.snowMountainModel3.rotation.set(
+            settings.objects.mountain3.rotation.x,
+            settings.objects.mountain3.rotation.y,
+            settings.objects.mountain3.rotation.z
+          )
+        }
+      }
+
+      // Apply lighting
+      if (settings.lighting && settings.lighting.globalIntensity !== undefined) {
+        this.setGlobalLightIntensity(settings.lighting.globalIntensity)
+      }
+
+      // Apply post-processing (will be handled by existing sliders if we trigger their updates)
+      // Apply layer visibility
+      if (settings.layers && settings.layers.visibility) {
+        this.layerVisibility = settings.layers.visibility
+        this.applyLayerVisibility()
+      }
+
+      // Save to localStorage for development
+      localStorage.setItem('importedSettings', JSON.stringify(settings))
+
+      console.log('✅ Settings imported and applied successfully!')
+      alert('✅ Settings imported successfully!')
+
+    } catch (error) {
+      console.error('❌ Failed to import settings:', error)
+      alert('❌ Failed to import settings. Please check the file format.')
+    }
+  }
+
+  /**
+   * Load default settings from JSON file (for production)
+   * Falls back to localStorage for development
+   */
+  async loadDefaultSettings() {
+    console.log('📂 Loading default settings...')
+
+    try {
+      // Try to load from default config file
+      const response = await fetch('/config/default-settings.json')
+
+      if (response.ok) {
+        const settings = await response.json()
+        console.log('✅ Loaded default settings from config file')
+
+        // Apply settings (similar to importSettings but without file parameter)
+        await this.applySettings(settings)
+        return true
+      }
+    } catch (error) {
+      console.log('ℹ️ No default settings file found, using localStorage or defaults')
+    }
+
+    // Fallback to localStorage (development)
+    const imported = localStorage.getItem('importedSettings')
+    if (imported) {
+      try {
+        const settings = JSON.parse(imported)
+        console.log('✅ Loaded settings from localStorage')
+        await this.applySettings(settings)
+        return true
+      } catch (e) {
+        console.error('Failed to parse localStorage settings:', e)
+      }
+    }
+
+    console.log('Using hard-coded defaults')
+    return false
+  }
+
+  /**
+   * Helper: Apply settings object
+   */
+  async applySettings(settings) {
+    // Same logic as importSettings but reusable
+    if (settings.camera) {
+      if (settings.camera.position) {
+        this.camera.position.set(
+          settings.camera.position.x,
+          settings.camera.position.y,
+          settings.camera.position.z
+        )
+      }
+      if (settings.camera.target && this.controls) {
+        this.controls.target.set(
+          settings.camera.target.x,
+          settings.camera.target.y,
+          settings.camera.target.z
+        )
+      }
+      if (settings.camera.fov) {
+        this.camera.fov = settings.camera.fov
+        this.camera.updateProjectionMatrix()
+      }
+    }
+
+    if (settings.objects) {
+      if (settings.objects.mountain1 && this.snowMountainModel) {
+        this.snowMountainModel.position.set(
+          settings.objects.mountain1.position.x,
+          settings.objects.mountain1.position.y,
+          settings.objects.mountain1.position.z
+        )
+        this.snowMountainModel.rotation.set(
+          settings.objects.mountain1.rotation.x,
+          settings.objects.mountain1.rotation.y,
+          settings.objects.mountain1.rotation.z
+        )
+      }
+      if (settings.objects.mountain2 && this.snowMountainModel2) {
+        this.snowMountainModel2.position.set(
+          settings.objects.mountain2.position.x,
+          settings.objects.mountain2.position.y,
+          settings.objects.mountain2.position.z
+        )
+        this.snowMountainModel2.rotation.set(
+          settings.objects.mountain2.rotation.x,
+          settings.objects.mountain2.rotation.y,
+          settings.objects.mountain2.rotation.z
+        )
+      }
+      if (settings.objects.mountain3 && this.snowMountainModel3) {
+        this.snowMountainModel3.position.set(
+          settings.objects.mountain3.position.x,
+          settings.objects.mountain3.position.y,
+          settings.objects.mountain3.position.z
+        )
+        this.snowMountainModel3.rotation.set(
+          settings.objects.mountain3.rotation.x,
+          settings.objects.mountain3.rotation.y,
+          settings.objects.mountain3.rotation.z
+        )
+      }
+    }
+
+    if (settings.lighting && settings.lighting.globalIntensity !== undefined) {
+      this.setGlobalLightIntensity(settings.lighting.globalIntensity)
+    }
+
+    if (settings.layers && settings.layers.visibility) {
+      this.layerVisibility = settings.layers.visibility
+      this.applyLayerVisibility()
+    }
+
+    console.log('✅ Settings applied')
+  }
+
   saveLockedCameraPosition() {
     if (!this.camera) return
 
@@ -1264,7 +1435,6 @@ class IglooExperience {
 
   getObjectByName(name) {
     switch(name) {
-      case 'ground': return this.iceGroundModel
       case 'mountain1': return this.snowMountainModel
       case 'mountain2': return this.snowMountainModel2
       case 'mountain3': return this.snowMountainModel3
@@ -1301,8 +1471,7 @@ class IglooExperience {
     const object = this.getObjectByName(objectName)
     if (object && object.visible) {
       // Map layer objectName to internal object names
-      const internalName = objectName === 'ground' ? 'ground' :
-                          objectName === 'mountain1' ? 'mountain' :
+      const internalName = objectName === 'mountain1' ? 'mountain' :
                           objectName === 'mountain2' ? 'mountain2' :
                           'mountain3'
       this.selectObject(object, internalName)
@@ -1972,7 +2141,6 @@ class IglooExperience {
     // Debug info elements
     this.cameraPosEl = document.getElementById('camera-pos')
     this.iglooPosEl = document.getElementById('igloo-pos')
-    this.groundPosEl = document.getElementById('ground-pos')
     this.mountainPosEl = document.getElementById('mountain-pos')
     this.mountain2PosEl = document.getElementById('mountain2-pos')
     this.mountain3PosEl = document.getElementById('mountain3-pos')
@@ -1984,6 +2152,12 @@ class IglooExperience {
       this.debugPanel.classList.toggle('minimized')
       this.debugMinimizeBtn.textContent = this.debugPanel.classList.contains('minimized') ? '+' : '−'
     })
+
+    // Prevent scroll events on debug panel from triggering page transitions
+    // When user scrolls inside panel with trackpad (2 fingers), only scroll the panel
+    this.debugPanel.addEventListener('wheel', (e) => {
+      e.stopPropagation() // Stop event from bubbling to window (prevents page transitions)
+    }, { passive: false })
 
     // Rotation toggle
     this.rotationToggle.addEventListener('change', (e) => {
@@ -2036,22 +2210,28 @@ class IglooExperience {
       })
     }
 
-    // Save/Reset position buttons
-    const saveBtn = document.getElementById('save-position-btn')
-    const resetBtn = document.getElementById('reset-position-btn')
+    // Export/Import Settings buttons
+    const exportBtn = document.getElementById('export-settings-btn')
+    const importBtn = document.getElementById('import-settings-btn')
+    const importInput = document.getElementById('import-settings-input')
 
-    if (saveBtn) {
-      saveBtn.addEventListener('click', () => {
-        this.saveIceGroundPosition()
-        alert('✅ Ice ground position saved!')
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => {
+        this.exportSettings()
       })
     }
 
-    if (resetBtn) {
-      resetBtn.addEventListener('click', () => {
-        if (confirm('Reset ice ground to default position?')) {
-          this.resetIceGroundPosition()
-          alert('🔄 Position reset to default!')
+    if (importBtn && importInput) {
+      importBtn.addEventListener('click', () => {
+        importInput.click()
+      })
+
+      importInput.addEventListener('change', (e) => {
+        const file = e.target.files[0]
+        if (file) {
+          this.importSettings(file)
+          // Reset input so same file can be imported again
+          e.target.value = ''
         }
       })
     }
@@ -2147,94 +2327,6 @@ class IglooExperience {
     }
   }
 
-  toggleTransformMode(enabled) {
-    console.log('🎯 toggleTransformMode called with enabled:', enabled)
-
-    if (!this.transformControl) {
-      console.error('❌ Transform controls not available! Check if ice ground model loaded.')
-      console.log('Ice ground model:', this.iceGroundModel)
-      return
-    }
-
-    console.log('✓ Transform control exists:', this.transformControl)
-
-    if (enabled) {
-      // Disable rotate mode if enabled
-      if (this.rotateToggle && this.rotateToggle.checked) {
-        this.rotateToggle.checked = false
-        console.log('✓ Disabled rotate mode')
-      }
-
-      // Enable transform (position) mode
-      this.transformControl.setMode('translate')
-      this.transformControl.enabled = true
-      this.transformControl.visible = true
-
-      console.log('✅ Transform mode ENABLED - drag arrows to move ice ground')
-      console.log('  - Control visible:', this.transformControl.visible)
-      console.log('  - Control enabled:', this.transformControl.enabled)
-      console.log('  - Control mode:', this.transformControl.mode)
-    } else {
-      // Disable and hide transform control
-      this.transformControl.enabled = false
-      this.transformControl.visible = false
-
-      // Log final position
-      if (this.iceGroundModel) {
-        console.log('💾 Ice Ground Final Position:', {
-          x: this.iceGroundModel.position.x.toFixed(2),
-          y: this.iceGroundModel.position.y.toFixed(2),
-          z: this.iceGroundModel.position.z.toFixed(2)
-        })
-      }
-      console.log('🔒 Transform mode disabled')
-    }
-  }
-
-  toggleRotateMode(enabled) {
-    console.log('🔄 toggleRotateMode called with enabled:', enabled)
-
-    if (!this.transformControl) {
-      console.error('❌ Transform controls not available! Check if ice ground model loaded.')
-      console.log('Ice ground model:', this.iceGroundModel)
-      return
-    }
-
-    console.log('✓ Transform control exists:', this.transformControl)
-
-    if (enabled) {
-      // Disable transform mode if enabled
-      if (this.transformToggle && this.transformToggle.checked) {
-        this.transformToggle.checked = false
-        console.log('✓ Disabled transform mode')
-      }
-
-      // Enable rotate mode
-      this.transformControl.setMode('rotate')
-      this.transformControl.enabled = true
-      this.transformControl.visible = true
-
-      console.log('✅ Rotate mode ENABLED - drag circles to rotate ice ground')
-      console.log('  - Control visible:', this.transformControl.visible)
-      console.log('  - Control enabled:', this.transformControl.enabled)
-      console.log('  - Control mode:', this.transformControl.mode)
-    } else {
-      // Disable and hide transform control
-      this.transformControl.enabled = false
-      this.transformControl.visible = false
-
-      // Log final rotation
-      if (this.iceGroundModel) {
-        console.log('💾 Ice Ground Final Rotation:', {
-          x: THREE.MathUtils.radToDeg(this.iceGroundModel.rotation.x).toFixed(2) + '°',
-          y: THREE.MathUtils.radToDeg(this.iceGroundModel.rotation.y).toFixed(2) + '°',
-          z: THREE.MathUtils.radToDeg(this.iceGroundModel.rotation.z).toFixed(2) + '°'
-        })
-      }
-      console.log('🔒 Rotate mode disabled')
-    }
-  }
-
   updateDebugInfo() {
     if (this.debugPanel.classList.contains('hidden')) return
 
@@ -2246,13 +2338,6 @@ class IglooExperience {
       const baseY = -1.5
       const currentY = this.iceStructure.position.y
       this.iglooPosEl.textContent = `${this.iceStructure.position.x.toFixed(2)}, ${currentY.toFixed(2)} (base: ${baseY}), ${this.iceStructure.position.z.toFixed(2)}`
-    }
-
-    // Update ground position
-    if (this.iceGroundModel) {
-      this.groundPosEl.textContent = `${this.iceGroundModel.position.x.toFixed(2)}, ${this.iceGroundModel.position.y.toFixed(2)}, ${this.iceGroundModel.position.z.toFixed(2)}`
-    } else {
-      this.groundPosEl.textContent = 'Not loaded'
     }
 
     // Update mountain position

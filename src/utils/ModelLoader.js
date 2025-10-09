@@ -154,16 +154,6 @@ export class ModelLoader {
 
         // Create enhanced material config that preserves textures
         const enhancedConfig = {
-          // Preserve original textures
-          map: preservedTextures.map,
-          normalMap: preservedTextures.normalMap,
-          roughnessMap: preservedTextures.roughnessMap,
-          metalnessMap: preservedTextures.metalnessMap,
-          aoMap: preservedTextures.aoMap,
-          emissiveMap: preservedTextures.emissiveMap,
-          alphaMap: preservedTextures.alphaMap,
-          lightMap: preservedTextures.lightMap,
-
           // Base color (white if texture exists, otherwise use original/default)
           color: baseColor,
 
@@ -184,9 +174,31 @@ export class ModelLoader {
           envMapIntensity: 2.0
         };
 
-        // Apply normal scale if normal map exists
+        // Only add texture maps if they exist (prevents THREE.js undefined warnings)
+        if (preservedTextures.map) {
+          enhancedConfig.map = preservedTextures.map;
+        }
         if (preservedTextures.normalMap) {
+          enhancedConfig.normalMap = preservedTextures.normalMap;
           enhancedConfig.normalScale = originalMaterial.normalScale || new THREE.Vector2(1, 1);
+        }
+        if (preservedTextures.roughnessMap) {
+          enhancedConfig.roughnessMap = preservedTextures.roughnessMap;
+        }
+        if (preservedTextures.metalnessMap) {
+          enhancedConfig.metalnessMap = preservedTextures.metalnessMap;
+        }
+        if (preservedTextures.aoMap) {
+          enhancedConfig.aoMap = preservedTextures.aoMap;
+        }
+        if (preservedTextures.emissiveMap) {
+          enhancedConfig.emissiveMap = preservedTextures.emissiveMap;
+        }
+        if (preservedTextures.alphaMap) {
+          enhancedConfig.alphaMap = preservedTextures.alphaMap;
+        }
+        if (preservedTextures.lightMap) {
+          enhancedConfig.lightMap = preservedTextures.lightMap;
         }
 
         // Create new material with preserved textures

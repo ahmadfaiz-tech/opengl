@@ -245,22 +245,6 @@
         <button id="reset-postprocessing-btn" class="debug-action-btn" style="margin-top: 12px; width: 100%;">🔄 Reset All</button>
       </div>
 
-      <!-- Ice Ground Selection -->
-      <div class="debug-section">
-        <h3>🎯 Ice Ground Selection</h3>
-        <div class="debug-info">
-          <div class="info-row">
-            <span>Selected:</span>
-            <span id="selection-state">No</span>
-          </div>
-        </div>
-        <div class="debug-row" style="margin-top: 12px; display: flex; gap: 8px;">
-          <button id="save-position-btn" class="debug-action-btn">💾 Save Position</button>
-          <button id="reset-position-btn" class="debug-action-btn">🔄 Reset</button>
-        </div>
-        <p class="debug-hint">Click ice ground to select. Use arrow keys to move (Shift = faster)</p>
-      </div>
-
       <!-- Debug Info -->
       <div class="debug-section">
         <h3>📍 Position Info</h3>
@@ -272,10 +256,6 @@
           <div class="info-row">
             <span>Igloo:</span>
             <span id="igloo-pos">0, 0, 0</span>
-          </div>
-          <div class="info-row">
-            <span>Ice Ground:</span>
-            <span id="ground-pos">Not loaded</span>
           </div>
           <div class="info-row">
             <span>Mountain 1:</span>
@@ -303,6 +283,15 @@
         </div>
       </div>
 
+      <!-- Settings Export/Import -->
+      <div class="debug-section">
+        <h3>💾 Settings Management</h3>
+        <button id="export-settings-btn" class="debug-action-btn" style="width: 100%;">📥 Export Settings</button>
+        <button id="import-settings-btn" class="debug-action-btn" style="width: 100%; margin-top: 8px;">📤 Import Settings</button>
+        <input type="file" id="import-settings-input" accept=".json" style="display: none;">
+        <p class="debug-hint">Export settings before deploy. Import to restore saved settings.</p>
+      </div>
+
       <!-- Layers Panel -->
       <div class="debug-section">
         <h3>📋 Layers</h3>
@@ -314,14 +303,6 @@
             </button>
             <span class="layer-name">🏠 Igloo</span>
             <span class="layer-lock">🔒</span>
-          </div>
-
-          <!-- Ice Ground -->
-          <div class="layer-item" data-object="ground">
-            <button class="layer-visibility" data-object="ground">
-              <span class="eye-icon">👁️</span>
-            </button>
-            <span class="layer-name">🧊 Ice Ground</span>
           </div>
 
           <!-- Mountain 1 -->

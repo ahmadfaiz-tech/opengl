@@ -60,7 +60,7 @@ Jalankan development server:
 npm run dev
 ```
 
-Server akan berjalan di `http://localhost:3000` dan akan membuka browser secara automatik.
+Server akan berjalan di `http://localhost:3001` dan akan membuka browser secara automatik.
 
 ### Build untuk Production
 
@@ -85,7 +85,7 @@ Tekan `Ctrl+Shift+P` (atau `Cmd+Shift+P` di Mac) dan taip "Tasks: Run Task", kem
 ## 🎯 Cara Menggunakan
 
 1. Run `npm run dev`
-2. Buka browser di `http://localhost:3000`
+2. Buka browser di `http://localhost:3001`
 3. Interact dengan 3D scene:
    - **Drag** - Rotate camera
    - **Scroll** - Zoom in/out
